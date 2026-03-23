@@ -69,7 +69,7 @@
             backdrop-filter: blur(10px);
         }
 
-        input[type="text"], input[type="password"] {
+        input[type="text"], input[type="password"], select {
             width: 100%;
             padding: 15px;
             border: 2px solid rgba(255, 255, 255, 0.1);
@@ -82,7 +82,7 @@
             -webkit-appearance: none;
         }
 
-        input[type="text"]:focus, input[type="password"]:focus {
+        input[type="text"]:focus, input[type="password"]:focus, select:focus {
             outline: none;
             border-color: #ff6b6b;
             transform: translateY(-2px);
@@ -588,6 +588,57 @@
             display: none !important;
         }
 
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 5px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            background: none;
+            border: none;
+            color: #a0a0a0;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin: 0;
+            text-transform: none;
+            letter-spacing: 0;
+            width: auto;
+        }
+
+        .tab.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .question-item {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            margin-bottom: 8px;
+            border-radius: 8px;
+            border-left: 3px solid #feca57;
+        }
+
+        .question-category {
+            font-size: 0.75rem;
+            color: #a0a0a0;
+            margin-bottom: 4px;
+        }
+
         @media (max-width: 400px) {
             .players-grid {
                 grid-template-columns: repeat(2, 1fr);
@@ -611,7 +662,7 @@
     </div>
 
     <div class="container">
-        <!-- Setup Screen (Enter Supabase credentials) -->
+        <!-- Setup Screen -->
         <div id="setupScreen" class="screen active">
             <h1>⚙️ Setup</h1>
             <p class="subtitle">Connect to your Supabase project</p>
@@ -665,9 +716,76 @@
                 </ol>
             </div>
             
+            <button class="btn-secondary" onclick="showScreen('adminScreen')" style="margin-top: 10px;">
+                Manage Questions
+            </button>
             <button class="btn-secondary" onclick="backToSetup()" style="margin-top: 10px;">
                 Change Connection
             </button>
+        </div>
+
+        <!-- Admin Screen -->
+        <div id="adminScreen" class="screen">
+            <h1>⚙️ Admin</h1>
+            
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('add')">Add Question</button>
+                <button class="tab" onclick="switchTab('view')">View All</button>
+            </div>
+
+            <div id="addTab" class="tab-content active">
+                <div class="card">
+                    <h3 style="margin-bottom: 15px; color: #feca57;">Add New Question</h3>
+                    <input type="text" id="newQuestionInput" placeholder="Who would...?" maxlength="200">
+                    <select id="questionCategory">
+                        <option value="Savage / Funny Questions">Savage / Funny Questions</option>
+                        <option value="Embarrassing Ones">Embarrassing Ones</option>
+                        <option value="Brutal Ones">Brutal Ones</option>
+                        <option value="Spicy / Risky">Spicy / Risky</option>
+                        <option value="Random / Fun">Random / Fun</option>
+                        <option value="Funny / Light">Funny / Light</option>
+                        <option value="Embarrassing">Embarrassing</option>
+                        <option value="Brutal">Brutal</option>
+                        <option value="Spicy">Spicy</option>
+                        <option value="Random / Wild">Random / Wild</option>
+                        <option value="Chaos Mode">Chaos Mode</option>
+                        <option value="Cold Truths">Cold Truths</option>
+                        <option value="Personal Attacks (Danger Zone)">Personal Attacks (Danger Zone)</option>
+                        <option value="Bonus Drinking Chaos">Bonus Drinking Chaos</option>
+                        <option value="FINAL BOSS QUESTIONS">FINAL BOSS QUESTIONS</option>
+                        <option value="Flirty & Suggestive">Flirty & Suggestive</option>
+                        <option value="Risky Reputation">Risky Reputation</option>
+                        <option value="Confidence / Energy">Confidence / Energy</option>
+                        <option value="Dirty Mind">Dirty Mind</option>
+                        <option value="Relationship Drama">Relationship Drama</option>
+                        <option value="Savage + Spicy">Savage + Spicy</option>
+                        <option value="Very Suggestive / Pushy">Very Suggestive / Pushy</option>
+                        <option value="Reputation Destroyers">Reputation Destroyers</option>
+                        <option value="Dirty Mind / Energy">Dirty Mind / Energy</option>
+                        <option value="Party Chaos Mode">Party Chaos Mode</option>
+                        <option value="Wild Reputation">Wild Reputation</option>
+                        <option value="You Know What They Mean">You Know What They Mean</option>
+                        <option value="Party + Hookup Chaos">Party + Hookup Chaos</option>
+                        <option value="Savage + Sexual Energy">Savage + Sexual Energy</option>
+                        <option value="Relationship + Lust Drama">Relationship + Lust Drama</option>
+                        <option value="FINAL DANGER ROUND">FINAL DANGER ROUND</option>
+                        <option value="Custom">Custom</option>
+                    </select>
+                    <button class="btn-primary" onclick="addNewQuestion()">Add Question</button>
+                    <div id="adminError" class="error"></div>
+                </div>
+            </div>
+
+            <div id="viewTab" class="tab-content">
+                <div class="card">
+                    <h3 style="margin-bottom: 15px; color: #feca57;">All Questions (<span id="questionCount">0</span>)</h3>
+                    <div id="questionsList" style="max-height: 400px; overflow-y: auto;">
+                        Loading...
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-secondary" onclick="showScreen('joinScreen')" style="margin-top: 10px;">Back to Game</button>
         </div>
 
         <!-- Lobby Screen -->
@@ -809,38 +927,7 @@
         const CONFIG = {
             MIN_PLAYERS: 3,
             POINTS_TO_WIN: 7,
-            QUESTIONS: [
-                "Who would survive the longest in a zombie apocalypse?",
-                "Who has the worst taste in romantic partners?",
-                "Who would sell their soul for the least amount of money?",
-                "Who is most likely to fake their own death?",
-                "Who would be the worst parent?",
-                "Who has done the most 'walks of shame'?",
-                "Who would start a cult and actually succeed?",
-                "Who is most likely to get catfished online?",
-                "Who would throw their friend under the bus to save themselves?",
-                "Who has the most embarrassing search history?",
-                "Who would be the first to die in a horror movie?",
-                "Who is most likely to cry during a commercial?",
-                "Who would get into a fight at a family reunion?",
-                "Who would be friends with a dictator for the perks?",
-                "Who has the worst luck in general?",
-                "Who would snitch on their friends to the police?",
-                "Who is most likely to develop a gambling addiction?",
-                "Who would ghost their own wedding?",
-                "Who has the most skeletons in their closet?",
-                "Who would fail a lie detector test immediately?",
-                "Who is most likely to get banned from a casino?",
-                "Who would believe the most ridiculous conspiracy theory?",
-                "Who has the worst impulse control?",
-                "Who would accidentally start a fire and blame someone else?",
-                "Who is most likely to have a secret family?",
-                "Who would eat someone else's lunch from the office fridge?",
-                "Who has the worst road rage?",
-                "Who would cut in line and not feel bad about it?",
-                "Who is most likely to get lost in their own neighborhood?",
-                "Who would forget their own birthday?"
-            ]
+            QUESTIONS: []
         };
 
         // Global State
@@ -864,7 +951,6 @@
 
         // Initialize
         window.onload = function() {
-            // Check for saved credentials
             const savedUrl = localStorage.getItem('supabaseUrl');
             const savedKey = localStorage.getItem('supabaseKey');
             
@@ -890,26 +976,26 @@
             btn.innerHTML = 'Connecting... <div class="loading"></div>';
             
             try {
-                // Initialize Supabase client
                 supabase = window.supabase.createClient(url, key);
                 
-                // Test connection
-                const { data, error } = await supabase.from('rooms').select('count', { count: 'exact', head: true });
+                const { error } = await supabase.from('rooms').select('count', { count: 'exact', head: true });
                 
-                if (error && error.code !== 'PGRST116') { // PGRST116 = table doesn't exist, which is OK
+                if (error && error.code !== 'PGRST116') {
                     throw error;
                 }
                 
-                // Save credentials
                 localStorage.setItem('supabaseUrl', url);
                 localStorage.setItem('supabaseKey', key);
                 
                 updateConnectionStatus(true);
+                showToast('Connected! Loading questions...');
+                
+                await loadQuestionsFromSupabase();
+                
                 showScreen('joinScreen');
-                showToast('Connected to Supabase!');
+                showToast(`Loaded ${CONFIG.QUESTIONS.length} questions!`);
                 
             } catch (error) {
-                console.error('Connection error:', error);
                 showError('setupError', 'Failed to connect: ' + error.message);
                 btn.disabled = false;
                 btn.textContent = 'Connect';
@@ -922,6 +1008,130 @@
                 supabase.removeChannel(realtimeChannel);
                 realtimeChannel = null;
             }
+        }
+
+        // Load questions from Supabase
+        async function loadQuestionsFromSupabase() {
+            try {
+                const { data: questions, error } = await supabase
+                    .from('questions')
+                    .select('*')
+                    .order('created_at', { ascending: true });
+                
+                if (error) throw error;
+                
+                if (questions && questions.length > 0) {
+                    CONFIG.QUESTIONS = questions.map(q => ({
+                        text: q.question_text,
+                        category: q.category
+                    }));
+                } else {
+                    CONFIG.QUESTIONS = getDefaultQuestions();
+                }
+                
+            } catch (error) {
+                console.error('Error loading questions:', error);
+                CONFIG.QUESTIONS = getDefaultQuestions();
+            }
+        }
+
+        // Fallback default questions
+        function getDefaultQuestions() {
+            return [
+                { text: "Who would survive the longest in a zombie apocalypse?", category: "Random" },
+                { text: "Who has the worst taste in romantic partners?", category: "Savage" },
+                { text: "Who would sell their soul for the least amount of money?", category: "Savage" },
+                { text: "Who is most likely to fake their own death?", category: "Random" },
+                { text: "Who would be the worst parent?", category: "Brutal" },
+                { text: "Who has done the most 'walks of shame'?", category: "Embarrassing" },
+                { text: "Who would start a cult and actually succeed?", category: "Random" },
+                { text: "Who is most likely to get catfished online?", category: "Embarrassing" },
+                { text: "Who would throw their friend under the bus to save themselves?", category: "Brutal" },
+                { text: "Who has the most embarrassing search history?", category: "Embarrassing" }
+            ];
+        }
+
+        // Get random question
+        function getRandomQuestion() {
+            if (CONFIG.QUESTIONS.length === 0) {
+                return "Who is the worst? (No questions loaded)";
+            }
+            const q = CONFIG.QUESTIONS[Math.floor(Math.random() * CONFIG.QUESTIONS.length)];
+            return q.text || q;
+        }
+
+        // Admin Functions
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tab + 'Tab').classList.add('active');
+            
+            if (tab === 'view') {
+                loadQuestionsList();
+            }
+        }
+
+        async function addNewQuestion() {
+            const input = document.getElementById('newQuestionInput');
+            const category = document.getElementById('questionCategory');
+            const text = input.value.trim();
+            
+            if (!text) {
+                showError('adminError', 'Enter a question');
+                return;
+            }
+            
+            if (!text.toLowerCase().startsWith('who')) {
+                showError('adminError', 'Question should start with "Who"');
+                return;
+            }
+            
+            try {
+                const { data, error } = await supabase
+                    .from('questions')
+                    .insert({
+                        question_text: text,
+                        category: category.value,
+                        is_default: false
+                    })
+                    .select()
+                    .single();
+                
+                if (error) throw error;
+                
+                input.value = '';
+                showToast('Question added!');
+                
+                // Reload questions
+                await loadQuestionsFromSupabase();
+                
+            } catch (error) {
+                showError('adminError', error.message);
+            }
+        }
+
+        async function loadQuestionsList() {
+            const { data: questions, error } = await supabase
+                .from('questions')
+                .select('*')
+                .order('created_at', { ascending: false });
+            
+            if (error) {
+                document.getElementById('questionsList').innerHTML = 'Error loading questions';
+                return;
+            }
+            
+            document.getElementById('questionCount').textContent = questions.length;
+            
+            const list = document.getElementById('questionsList');
+            list.innerHTML = questions.map(q => `
+                <div class="question-item" style="border-left-color: ${q.is_default ? '#feca57' : '#3ec1d3'};">
+                    <div class="question-category">${q.category}</div>
+                    <div>${q.question_text}</div>
+                </div>
+            `).join('');
         }
 
         // Room Management
@@ -941,7 +1151,6 @@
             const code = Math.random().toString(36).substring(2, 8).toUpperCase();
             
             try {
-                // Create room in Supabase
                 const { data: room, error } = await supabase
                     .from('rooms')
                     .insert({
@@ -955,7 +1164,6 @@
                 
                 if (error) throw error;
                 
-                // Create the first player
                 const { data: player, error: playerError } = await supabase
                     .from('players')
                     .insert({
@@ -977,7 +1185,6 @@
                 enterLobby(room.id);
                 
             } catch (error) {
-                console.error('Create room error:', error);
                 showError('joinError', 'Failed to create room: ' + error.message);
             }
         }
@@ -995,7 +1202,6 @@
             btn.innerHTML = 'Joining... <div class="loading"></div>';
             
             try {
-                // Find room
                 const { data: room, error: roomError } = await supabase
                     .from('rooms')
                     .select('*')
@@ -1010,7 +1216,6 @@
                     throw new Error('Game already started');
                 }
                 
-                // Check existing players count
                 const { data: existingPlayers, error: countError } = await supabase
                     .from('players')
                     .select('*')
@@ -1020,12 +1225,10 @@
                     throw new Error('Room full');
                 }
                 
-                // Check name uniqueness
                 if (existingPlayers && existingPlayers.find(p => p.name === username)) {
                     throw new Error('Name taken');
                 }
                 
-                // Create player
                 const { data: player, error: playerError } = await supabase
                     .from('players')
                     .insert({
@@ -1070,7 +1273,6 @@
 
         // Real-time Subscription
         function subscribeToRoom(roomId) {
-            // Subscribe to room changes
             realtimeChannel = supabase
                 .channel('room:' + roomId)
                 .on('postgres_changes', 
@@ -1086,7 +1288,6 @@
                     () => loadVotes(roomId)
                 )
                 .subscribe((status) => {
-                    console.log('Subscription status:', status);
                     if (status === 'SUBSCRIBED') {
                         updateConnectionStatus(true);
                         loadPlayers(roomId);
@@ -1106,7 +1307,6 @@
             state.players = players;
             updateLobby();
             
-            // Update current user data
             const updatedMe = players.find(p => p.id === state.currentUser?.id);
             if (updatedMe) {
                 state.currentUser = updatedMe;
@@ -1142,12 +1342,10 @@
             state.currentReader = room.current_reader;
             state.round = room.current_round;
             
-            // Update scores from room data
             if (room.scores) {
                 state.scores = room.scores;
             }
             
-            // Route to appropriate screen
             if (state.gameState === 'playing' || state.gameState === 'results') {
                 if (document.getElementById('lobbyScreen').classList.contains('active')) {
                     showScreen('gameScreen');
@@ -1155,7 +1353,6 @@
                 updateGameView();
             }
             
-            // Check for winner
             if (state.scores && Object.entries(state.scores).length > 0) {
                 const winner = Object.entries(state.scores).find(([id, score]) => score >= CONFIG.POINTS_TO_WIN);
                 if (winner && !document.getElementById('winnerScreen').classList.contains('active')) {
@@ -1206,11 +1403,9 @@
             try {
                 const roomId = state.currentUser.room_id;
                 
-                // Initialize scores
                 const scores = {};
                 state.players.forEach(p => scores[p.id] = 0);
                 
-                // Update room
                 const { error } = await supabase
                     .from('rooms')
                     .update({
@@ -1362,7 +1557,7 @@
             btn.textContent = 'Drawing...';
             
             try {
-                const question = CONFIG.QUESTIONS[Math.floor(Math.random() * CONFIG.QUESTIONS.length)];
+                const question = getRandomQuestion();
                 
                 const { error } = await supabase
                     .from('rooms')
@@ -1402,7 +1597,6 @@
                 
                 if (error) throw error;
                 
-                // Mark double down as used if applicable
                 if (doubleDown) {
                     await supabase
                         .from('players')
@@ -1429,13 +1623,11 @@
             try {
                 const roomId = state.currentUser.room_id;
                 
-                // Count votes
                 const voteCounts = {};
                 Object.values(state.votes).forEach(v => {
                     voteCounts[v.target] = (voteCounts[v.target] || 0) + 1;
                 });
                 
-                // Find majority
                 let maxVotes = 0;
                 let majority = null;
                 Object.entries(voteCounts).forEach(([target, count]) => {
@@ -1445,7 +1637,6 @@
                     }
                 });
                 
-                // Calculate new scores
                 const newScores = { ...state.scores };
                 Object.entries(state.votes).forEach(([voterId, vote]) => {
                     if (vote.target === majority) {
@@ -1454,7 +1645,6 @@
                     }
                 });
                 
-                // Update room
                 const { error } = await supabase
                     .from('rooms')
                     .update({
@@ -1480,7 +1670,6 @@
             
             document.getElementById('resultQuestion').textContent = state.currentQuestion;
             
-            // Get majority from last state or calculate
             const majority = state.players.find(p => {
                 const count = Object.values(state.votes).filter(v => v.target === p.id).length;
                 return count === Math.max(...Object.values(state.votes).map(v => 
@@ -1542,7 +1731,6 @@
                     })
                     .eq('id', roomId);
                 
-                // Clear votes for next round
                 await supabase
                     .from('votes')
                     .delete()
@@ -1589,7 +1777,6 @@
                 if (state.currentUser) {
                     await supabase.from('players').delete().eq('id', state.currentUser.id);
                     
-                    // If host, delete the room
                     if (state.isHost && state.currentUser.room_id) {
                         await supabase.from('rooms').delete().eq('id', state.currentUser.room_id);
                     }
@@ -1598,7 +1785,6 @@
                 console.error('Error leaving:', e);
             }
             
-            // Reset state
             state.currentUser = null;
             state.roomCode = null;
             state.isHost = false;
