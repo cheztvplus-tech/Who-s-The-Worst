@@ -1,0 +1,1800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Who's The Worst?</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 15px;
+            min-height: 100vh;
+        }
+
+        .screen {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 5px;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #a0a0a0;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        input[type="text"], input[type="password"], input[type="number"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+            -webkit-appearance: none;
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #ff6b6b;
+            transform: translateY(-2px);
+        }
+
+        button {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: #1a1a2e;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #ff4757, #ff6b6b);
+            color: #fff;
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
+            color: #fff;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .error {
+            color: #ff6b6b;
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            padding: 10px;
+            background: rgba(255, 107, 107, 0.1);
+            border-radius: 8px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .success {
+            color: #2ecc71;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #ff6b6b;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .game-code-display {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 2px dashed rgba(254, 202, 87, 0.3);
+        }
+
+        .game-code {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #feca57;
+            letter-spacing: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+
+        .players-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .player-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 12px 8px;
+            text-align: center;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .player-card.current-user {
+            border-color: #feca57;
+            background: rgba(254, 202, 87, 0.1);
+        }
+
+        .player-card.voted {
+            border-color: #2ecc71;
+            background: rgba(46, 204, 113, 0.1);
+        }
+
+        .player-card.reader {
+            border-color: #9b59b6;
+            background: rgba(155, 89, 182, 0.1);
+        }
+
+        .player-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin: 0 auto 8px;
+            color: #1a1a2e;
+        }
+
+        .player-name {
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 3px;
+            word-break: break-word;
+        }
+
+        .player-status {
+            font-size: 0.7rem;
+            color: #a0a0a0;
+        }
+
+        .question-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 30px 20px;
+            text-align: center;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            min-height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        .question-card.waiting {
+            background: rgba(255, 255, 255, 0.05);
+            color: #a0a0a0;
+            font-size: 1rem;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-buttons button {
+            flex: 1;
+            min-width: 120px;
+            margin-bottom: 0;
+        }
+
+        .double-down-section {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .double-down-btn {
+            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            border: 3px solid transparent;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .double-down-btn.active {
+            border-color: #fff;
+            box-shadow: 0 0 20px rgba(245, 87, 108, 0.6);
+            transform: scale(1.05);
+        }
+
+        .double-down-btn.used {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background: #555;
+        }
+
+        .vote-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        .vote-option {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .vote-option:active {
+            transform: scale(0.95);
+        }
+
+        .vote-option.selected {
+            background: rgba(46, 204, 113, 0.2);
+            border-color: #2ecc71;
+        }
+
+        .status-bar {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #a0a0a0;
+        }
+
+        .status-bar.active {
+            color: #2ecc71;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+
+        .scoreboard {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .score-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px 15px;
+            border-radius: 12px;
+            text-align: center;
+            min-width: 80px;
+            flex-shrink: 0;
+            border: 2px solid transparent;
+        }
+
+        .score-item.leading {
+            border-color: #feca57;
+            background: rgba(254, 202, 87, 0.1);
+        }
+
+        .score-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #feca57;
+        }
+
+        .score-name {
+            font-size: 0.75rem;
+            color: #a0a0a0;
+            margin-top: 2px;
+            max-width: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .results-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            margin-bottom: 8px;
+            border-radius: 10px;
+            border-left: 4px solid transparent;
+        }
+
+        .result-item.correct {
+            border-left-color: #2ecc71;
+            background: rgba(46, 204, 113, 0.1);
+        }
+
+        .result-item.wrong {
+            border-left-color: #ff4757;
+            opacity: 0.7;
+        }
+
+        .voter-name {
+            font-weight: 600;
+        }
+
+        .voted-for {
+            font-size: 0.9rem;
+            color: #a0a0a0;
+        }
+
+        .points-earned {
+            color: #2ecc71;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .admin-badge {
+            display: inline-block;
+            background: #9b59b6;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            margin-left: 5px;
+        }
+
+        .winner-display {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .winner-crown {
+            font-size: 5rem;
+            margin-bottom: 20px;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .winner-name {
+            font-size: 2.5rem;
+            background: linear-gradient(45deg, #feca57, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .winner-text {
+            color: #a0a0a0;
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+        }
+
+        .final-standings {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .standing-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .standing-rank {
+            font-size: 1.5rem;
+            font-weight: bold;
+            width: 40px;
+            color: #feca57;
+        }
+
+        .standing-name {
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .standing-score {
+            color: #feca57;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 5px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            background: none;
+            border: none;
+            color: #a0a0a0;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin: 0;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        .tab.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .admin-user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            margin-bottom: 10px;
+            border-radius: 10px;
+        }
+
+        .remove-btn {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            width: auto;
+            margin: 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #a0a0a0;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s;
+        }
+
+        .connection-status.online {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+
+        .connection-status.offline {
+            background: rgba(255, 71, 87, 0.2);
+            color: #ff4757;
+            border: 1px solid rgba(255, 71, 87, 0.3);
+        }
+
+        .connection-status.connecting {
+            background: rgba(254, 202, 87, 0.2);
+            color: #feca57;
+            border: 1px solid rgba(254, 202, 87, 0.3);
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background: currentColor;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 10px;
+            z-index: 2000;
+            transition: transform 0.3s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+            max-width: 90%;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .instructions {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .instructions h3 {
+            color: #feca57;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+            color: #a0a0a0;
+            line-height: 1.8;
+            font-size: 0.9rem;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+        }
+
+        .highlight {
+            color: #feca57;
+            font-weight: 600;
+        }
+
+        .network-error {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .network-error.show {
+            display: flex;
+        }
+
+        .network-error h2 {
+            color: #ff6b6b;
+            margin-bottom: 10px;
+        }
+
+        .network-error p {
+            color: #a0a0a0;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 400px) {
+            .players-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .game-code {
+                font-size: 2rem;
+                letter-spacing: 5px;
+            }
+            
+            h1 {
+                font-size: 1.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="connectionStatus" class="connection-status connecting">
+        <div class="pulse-dot"></div>
+        <span>Connecting...</span>
+    </div>
+
+    <div id="networkError" class="network-error">
+        <h2>⚠️ Connection Lost</h2>
+        <p>Having trouble connecting to the game server.<br>Check your internet and try again.</p>
+        <button class="btn-primary" onclick="retryConnection()" style="width: auto; padding: 12px 30px;">Retry</button>
+    </div>
+
+    <div class="container">
+        <!-- Join Screen -->
+        <div id="joinScreen" class="screen active">
+            <h1>👑 Who's The Worst?</h1>
+            <p class="subtitle">The party game of savage voting</p>
+            
+            <div class="card">
+                <input type="text" id="usernameInput" placeholder="Your name" maxlength="15" autocomplete="off">
+                <input type="text" id="roomCodeInput" placeholder="Room code (e.g., ABC123)" maxlength="6" style="text-transform: uppercase;">
+                <button class="btn-primary" onclick="joinGame()" id="joinBtn">
+                    Join Game
+                </button>
+                <button class="btn-secondary" onclick="createRoom()">
+                    Create New Room
+                </button>
+                <div id="joinError" class="error"></div>
+            </div>
+
+            <div class="instructions">
+                <h3>How to Play</h3>
+                <ol>
+                    <li>Enter your name and join a room</li>
+                    <li>Wait for 3+ players to join</li>
+                    <li>Read the question and vote for who fits best</li>
+                    <li>Guess the <span class="highlight">majority vote</span> to earn points</li>
+                    <li>Use <span class="highlight">Double Down</span> once for 2x points!</li>
+                    <li>First to <span class="highlight">7 points</span> wins</li>
+                </ol>
+            </div>
+
+            <button class="btn-secondary" onclick="showAdminLogin()" style="margin-top: 10px;">
+                Admin Access
+            </button>
+        </div>
+
+        <!-- Admin Login -->
+        <div id="adminLoginScreen" class="screen">
+            <h1>🔐 Admin</h1>
+            <div class="card">
+                <input type="password" id="adminPassword" placeholder="Admin password">
+                <button class="btn-primary" onclick="adminLogin()">Login</button>
+                <button class="btn-secondary" onclick="showScreen('joinScreen')">Back</button>
+                <div id="adminError" class="error"></div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <div id="adminScreen" class="screen">
+            <h1>⚙️ Admin</h1>
+            
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('rooms')">Rooms</button>
+                <button class="tab" onclick="switchTab('questions')">Questions</button>
+            </div>
+
+            <div id="roomsTab" class="tab-content active">
+                <div class="card">
+                    <h3 style="margin-bottom: 15px; color: #feca57;">Active Rooms</h3>
+                    <div id="adminRoomList">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📭</div>
+                            <p>Loading rooms...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3 style="margin-bottom: 15px; color: #ff6b6b;">Danger Zone</h3>
+                    <button class="btn-danger" onclick="clearAllRooms()">Clear All Rooms</button>
+                </div>
+            </div>
+
+            <div id="questionsTab" class="tab-content">
+                <div class="card">
+                    <h3 style="margin-bottom: 15px; color: #feca57;">Game Questions</h3>
+                    <div id="adminQuestionList" style="max-height: 400px; overflow-y: auto;">
+                        Loading...
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 style="margin-bottom: 15px;">Add Question</h3>
+                    <input type="text" id="newQuestionInput" placeholder="Who would...?" maxlength="200">
+                    <button class="btn-primary" onclick="addQuestion()">Add Question</button>
+                </div>
+            </div>
+
+            <button class="btn-secondary" onclick="logoutAdmin()" style="margin-top: 10px;">Logout</button>
+        </div>
+
+        <!-- Lobby Screen -->
+        <div id="lobbyScreen" class="screen">
+            <h1>🎮 Lobby</h1>
+            
+            <div class="game-code-display">
+                <div style="font-size: 0.9rem; color: #a0a0a0; margin-bottom: 5px;">ROOM CODE</div>
+                <div class="game-code" id="displayRoomCode">---</div>
+                <div style="font-size: 0.8rem; color: #a0a0a0;">Share this with friends!</div>
+            </div>
+
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="color: #feca57;">Players (<span id="playerCount">0</span>)</h3>
+                    <span id="playerRole" style="font-size: 0.8rem; color: #a0a0a0;"></span>
+                </div>
+                
+                <div class="players-grid" id="lobbyPlayers">
+                    <div class="empty-state" style="grid-column: 1/-1; padding: 20px;">
+                        <div class="empty-state-icon">👥</div>
+                        <p>Waiting for players...</p>
+                    </div>
+                </div>
+
+                <div id="hostControls" style="display: none; margin-top: 20px;">
+                    <div class="status-bar" id="startStatus">
+                        Need at least 3 players to start
+                    </div>
+                    <button class="btn-primary" onclick="startGame()" id="startBtn" disabled>
+                        Start Game
+                    </button>
+                </div>
+                
+                <div id="waitingMessage" style="text-align: center; padding: 20px; color: #a0a0a0;">
+                    Waiting for host to start...
+                </div>
+            </div>
+
+            <button class="btn-secondary" onclick="leaveRoom()">Leave Room</button>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="gameScreen" class="screen">
+            <div class="scoreboard" id="scoreboard">
+                <!-- Scores populated here -->
+            </div>
+
+            <!-- Reader View -->
+            <div id="readerView" style="display: none;">
+                <div class="status-bar active">
+                    📖 You are the Reader
+                </div>
+                
+                <div class="question-card" id="readerQuestionCard">
+                    Tap "Draw Card" when everyone is ready
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn-primary" onclick="drawCard()" id="drawCardBtn">Draw Card</button>
+                    <button class="btn-success hidden" onclick="revealVotes()" id="revealBtn">Reveal Votes</button>
+                    <button class="btn-primary hidden" onclick="nextRound()" id="nextRoundBtn">Next Round</button>
+                </div>
+
+                <div class="card" style="margin-top: 20px;">
+                    <h4 style="margin-bottom: 15px; color: #feca57;">Voting Status</h4>
+                    <div id="votingStatus" class="players-grid" style="grid-template-columns: repeat(4, 1fr);">
+                        <!-- Voting status -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Voter View -->
+            <div id="voterView">
+                <div class="status-bar" id="voterStatus">
+                    Waiting for question...
+                </div>
+
+                <div class="question-card waiting" id="voterQuestionCard">
+                    The reader is drawing a card...
+                </div>
+
+                <div class="double-down-section" id="doubleDownSection" style="display: none;">
+                    <button class="double-down-btn" id="doubleDownBtn" onclick="toggleDoubleDown()">
+                        🚀 DOUBLE DOWN
+                    </button>
+                    <p style="font-size: 0.8rem; color: #a0a0a0; margin-top: 8px;">
+                        Use once per game for 2x points!
+                    </p>
+                </div>
+
+                <div id="votingSection" style="display: none;">
+                    <h4 style="margin-bottom: 10px; text-align: center;">Who fits best?</h4>
+                    <div class="vote-grid" id="voteOptions">
+                        <!-- Vote options -->
+                    </div>
+                </div>
+
+                <div id="waitingSection" style="display: none; text-align: center; padding: 40px;">
+                    <div class="loading"></div>
+                    <p style="margin-top: 15px; color: #a0a0a0;">Waiting for other players...</p>
+                </div>
+            </div>
+
+            <!-- Results View -->
+            <div id="resultsView" style="display: none;">
+                <div class="status-bar active">
+                    🎉 Round Results
+                </div>
+                
+                <div class="question-card" id="resultQuestion" style="font-size: 1.1rem; min-height: auto; padding: 20px;">
+                    <!-- Question -->
+                </div>
+
+                <div class="results-container" id="resultsList">
+                    <!-- Results -->
+                </div>
+
+                <div class="card" style="text-align: center;">
+                    <h4 style="color: #feca57; margin-bottom: 10px;">Majority Voted For:</h4>
+                    <div id="majorityTarget" style="font-size: 1.5rem; font-weight: bold; color: #2ecc71;">
+                        <!-- Target -->
+                    </div>
+                </div>
+
+                <button class="btn-primary" onclick="acknowledgeResults()" id="continueBtn">
+                    Continue
+                </button>
+            </div>
+        </div>
+
+        <!-- Winner Screen -->
+        <div id="winnerScreen" class="screen">
+            <div class="winner-display">
+                <div class="winner-crown">👑</div>
+                <div class="winner-name" id="winnerName">Name</div>
+                <div class="winner-text">is officially the worst! 🎉</div>
+                
+                <div class="final-standings" id="finalStandings">
+                    <!-- Standings -->
+                </div>
+                
+                <button class="btn-primary" onclick="playAgain()">Play Again</button>
+                <button class="btn-secondary" onclick="leaveRoom()">Leave Room</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // Game Configuration
+        const CONFIG = {
+            WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzkjk2Qbn-xkPGLd0isEAjnhGyhkaGSON3UQsr3boJ0dLXgH6KnWxnqd8QRrNt1IjEVwQ/exec',
+            SYNC_INTERVAL: 2000,
+            MIN_PLAYERS: 3,
+            POINTS_TO_WIN: 7,
+            ADMIN_PASSWORD: 'worst123',
+            REQUEST_TIMEOUT: 10000
+        };
+
+        // Game State
+        const state = {
+            currentUser: null,
+            roomCode: null,
+            isHost: false,
+            players: [],
+            gameState: 'waiting',
+            currentQuestion: null,
+            currentReader: null,
+            votes: {},
+            scores: {},
+            doubleDownUsed: false,
+            hasVoted: false,
+            round: 1,
+            questions: [],
+            lastSync: 0,
+            isConnected: false
+        };
+
+        // Initialize
+        let syncInterval;
+        let requestQueue = [];
+        
+        window.onload = function() {
+            loadQuestions();
+            showScreen('joinScreen');
+            testConnection();
+        };
+
+        // Network Functions
+        async function makeRequest(action, data = {}) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
+            
+            try {
+                const response = await fetch(CONFIG.WEB_APP_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: action,
+                        roomCode: state.roomCode || data.roomCode,
+                        userId: state.currentUser?.id,
+                        userName: state.currentUser?.name,
+                        ...data
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (!state.isConnected) {
+                    state.isConnected = true;
+                    updateConnectionStatus(true);
+                    document.getElementById('networkError').classList.remove('show');
+                }
+                
+                return result;
+                
+            } catch (error) {
+                clearTimeout(timeoutId);
+                
+                if (error.name === 'AbortError') {
+                    console.error('Request timeout');
+                } else {
+                    console.error('Request failed:', error);
+                }
+                
+                state.isConnected = false;
+                updateConnectionStatus(false);
+                
+                // Show error if we're in a game
+                if (state.roomCode) {
+                    document.getElementById('networkError').classList.add('show');
+                }
+                
+                throw error;
+            }
+        }
+
+        async function testConnection() {
+            try {
+                updateConnectionStatus('connecting');
+                const result = await makeRequest('ping');
+                if (result.success) {
+                    updateConnectionStatus(true);
+                    showToast('Connected to server!');
+                }
+            } catch (e) {
+                updateConnectionStatus(false);
+                console.log('Initial connection test failed, will retry');
+            }
+        }
+
+        function retryConnection() {
+            document.getElementById('networkError').classList.remove('show');
+            testConnection();
+            if (state.roomCode) {
+                syncGameState();
+            }
+        }
+
+        // Screen Management
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function showToast(message, duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), duration);
+        }
+
+        function showError(elementId, message) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 5000);
+        }
+
+        function updateConnectionStatus(status) {
+            const el = document.getElementById('connectionStatus');
+            el.classList.remove('online', 'offline', 'connecting');
+            
+            if (status === true) {
+                el.classList.add('online');
+                el.innerHTML = '<div class="pulse-dot"></div><span>Live</span>';
+            } else if (status === 'connecting') {
+                el.classList.add('connecting');
+                el.innerHTML = '<div class="pulse-dot"></div><span>Connecting...</span>';
+            } else {
+                el.classList.add('offline');
+                el.innerHTML = '<div class="pulse-dot"></div><span>Offline</span>';
+            }
+        }
+
+        // Join/Create Functions
+        async function joinGame() {
+            const username = document.getElementById('usernameInput').value.trim();
+            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            const btn = document.getElementById('joinBtn');
+            
+            if (!username) return showError('joinError', 'Enter your name');
+            if (!roomCode) return showError('joinError', 'Enter room code');
+            if (username.length < 2) return showError('joinError', 'Name too short');
+            
+            btn.disabled = true;
+            btn.innerHTML = 'Joining... <div class="loading"></div>';
+            
+            try {
+                const result = await makeRequest('joinRoom', {
+                    roomCode: roomCode,
+                    userName: username
+                });
+                
+                if (!result.success) {
+                    showError('joinError', result.error || 'Failed to join');
+                    btn.disabled = false;
+                    btn.textContent = 'Join Game';
+                    return;
+                }
+                
+                state.currentUser = result.player;
+                state.roomCode = roomCode;
+                state.isHost = result.player.isHost;
+                state.players = result.room.players;
+                
+                enterLobby();
+                
+            } catch (error) {
+                showError('joinError', 'Network error. Please try again.');
+                btn.disabled = false;
+                btn.textContent = 'Join Game';
+            }
+        }
+
+        async function createRoom() {
+            const username = document.getElementById('usernameInput').value.trim();
+            
+            if (!username) return showError('joinError', 'Enter your name first');
+            if (username.length < 2) return showError('joinError', 'Name too short');
+            
+            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+            
+            try {
+                // Create room
+                await makeRequest('createRoom', { roomCode: code });
+                
+                // Join it
+                document.getElementById('roomCodeInput').value = code;
+                await joinGame();
+                
+            } catch (error) {
+                showError('joinError', 'Failed to create room. Please try again.');
+            }
+        }
+
+        function enterLobby() {
+            showScreen('lobbyScreen');
+            document.getElementById('displayRoomCode').textContent = state.roomCode;
+            
+            if (state.isHost) {
+                document.getElementById('hostControls').style.display = 'block';
+                document.getElementById('waitingMessage').style.display = 'none';
+                document.getElementById('playerRole').textContent = 'Host';
+            } else {
+                document.getElementById('playerRole').textContent = 'Player';
+            }
+            
+            updateLobby();
+            startSync();
+        }
+
+        function startSync() {
+            if (syncInterval) clearInterval(syncInterval);
+            syncInterval = setInterval(syncGameState, CONFIG.SYNC_INTERVAL);
+            syncGameState();
+        }
+
+        async function syncGameState() {
+            if (!state.roomCode) return;
+            
+            try {
+                const result = await makeRequest('getRoom', { roomCode: state.roomCode });
+                
+                if (!result.success || !result.room) {
+                    showToast('Room not found');
+                    return;
+                }
+                
+                const room = result.room;
+                
+                // Update state
+                state.players = room.players;
+                state.gameState = room.gameState;
+                state.currentQuestion = room.currentQuestion;
+                state.currentReader = room.currentReader;
+                state.votes = room.votes || {};
+                state.scores = room.scores || {};
+                state.round = room.round || 1;
+                
+                // Update UI
+                if (document.getElementById('lobbyScreen').classList.contains('active')) {
+                    updateLobby();
+                    
+                    if (state.gameState === 'playing') {
+                        showScreen('gameScreen');
+                        initGameView();
+                    }
+                } else if (document.getElementById('gameScreen').classList.contains('active')) {
+                    updateGameView();
+                    
+                    // Check for winner
+                    if (state.scores) {
+                        const winner = Object.entries(state.scores).find(([id, score]) => 
+                            score >= CONFIG.POINTS_TO_WIN
+                        );
+                        if (winner && !document.getElementById('winnerScreen').classList.contains('active')) {
+                            showWinner(winner[0]);
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Sync failed:', error);
+            }
+        }
+
+        function updateLobby() {
+            document.getElementById('playerCount').textContent = state.players.length;
+            
+            const grid = document.getElementById('lobbyPlayers');
+            if (state.players.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <div class="empty-state-icon">👥</div>
+                        <p>No players yet</p>
+                    </div>
+                `;
+            } else {
+                grid.innerHTML = state.players.map(p => `
+                    <div class="player-card ${p.id === state.currentUser?.id ? 'current-user' : ''}">
+                        <div class="player-avatar">${p.name.charAt(0).toUpperCase()}</div>
+                        <div class="player-name">${p.name}</div>
+                        <div class="player-status">${p.isHost ? '👑 Host' : 'Player'}</div>
+                    </div>
+                `).join('');
+            }
+            
+            if (state.isHost) {
+                const canStart = state.players.length >= CONFIG.MIN_PLAYERS;
+                const startBtn = document.getElementById('startBtn');
+                const status = document.getElementById('startStatus');
+                
+                startBtn.disabled = !canStart;
+                if (canStart) {
+                    status.textContent = `Ready to start! (${state.players.length} players)`;
+                    status.classList.add('active');
+                } else {
+                    status.textContent = `Need ${CONFIG.MIN_PLAYERS - state.players.length} more player(s)`;
+                    status.classList.remove('active');
+                }
+            }
+        }
+
+        async function startGame() {
+            if (!state.isHost) return;
+            
+            const btn = document.getElementById('startBtn');
+            btn.disabled = true;
+            btn.textContent = 'Starting...';
+            
+            try {
+                await makeRequest('startGame', { roomCode: state.roomCode });
+                showScreen('gameScreen');
+                initGameView();
+            } catch (error) {
+                showToast('Failed to start game');
+                btn.disabled = false;
+                btn.textContent = 'Start Game';
+            }
+        }
+
+        function initGameView() {
+            updateScoreboard();
+            
+            const isReader = state.currentReader === state.currentUser?.id;
+            
+            document.getElementById('readerView').style.display = isReader ? 'block' : 'none';
+            document.getElementById('voterView').style.display = isReader ? 'none' : 'block';
+            document.getElementById('resultsView').style.display = 'none';
+            
+            if (isReader) {
+                document.getElementById('readerQuestionCard').textContent = 'Tap "Draw Card" when everyone is ready';
+                document.getElementById('drawCardBtn').classList.remove('hidden');
+                document.getElementById('revealBtn').classList.add('hidden');
+                document.getElementById('nextRoundBtn').classList.add('hidden');
+                updateVotingStatus();
+            } else {
+                document.getElementById('voterQuestionCard').textContent = 'The reader is drawing a card...';
+                document.getElementById('voterQuestionCard').classList.add('waiting');
+                document.getElementById('voterStatus').textContent = 'Waiting for question...';
+                document.getElementById('voterStatus').classList.remove('active');
+                document.getElementById('doubleDownSection').style.display = 'none';
+                document.getElementById('votingSection').style.display = 'none';
+                document.getElementById('waitingSection').style.display = 'none';
+            }
+            
+            state.hasVoted = false;
+        }
+
+        function updateScoreboard() {
+            const board = document.getElementById('scoreboard');
+            const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
+            const maxScore = sorted.length > 0 ? sorted[0][1] : 0;
+            
+            board.innerHTML = sorted.map(([playerId, score]) => {
+                const player = state.players.find(p => p.id === playerId);
+                if (!player) return '';
+                return `
+                    <div class="score-item ${score === maxScore && score > 0 ? 'leading' : ''}">
+                        <div class="score-value">${score}</div>
+                        <div class="score-name">${player.name}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateGameView() {
+            updateScoreboard();
+            
+            const isReader = state.currentReader === state.currentUser?.id;
+            
+            if (state.currentQuestion) {
+                if (isReader) {
+                    document.getElementById('readerQuestionCard').textContent = state.currentQuestion;
+                    document.getElementById('drawCardBtn').classList.add('hidden');
+                    
+                    const allVoted = Object.keys(state.votes).length >= state.players.length - 1;
+                    const revealBtn = document.getElementById('revealBtn');
+                    
+                    if (allVoted && revealBtn.classList.contains('hidden')) {
+                        revealBtn.classList.remove('hidden');
+                        revealBtn.classList.add('pulse');
+                        showToast('Everyone voted!');
+                    }
+                    
+                    updateVotingStatus();
+                } else if (!state.hasVoted) {
+                    document.getElementById('voterQuestionCard').textContent = state.currentQuestion;
+                    document.getElementById('voterQuestionCard').classList.remove('waiting');
+                    document.getElementById('voterStatus').textContent = 'Vote now!';
+                    document.getElementById('voterStatus').classList.add('active');
+                    document.getElementById('doubleDownSection').style.display = 'block';
+                    document.getElementById('votingSection').style.display = 'block';
+                    
+                    const ddBtn = document.getElementById('doubleDownBtn');
+                    if (state.doubleDownUsed) {
+                        ddBtn.classList.add('used');
+                        ddBtn.disabled = true;
+                    } else {
+                        ddBtn.classList.remove('used', 'active');
+                        ddBtn.disabled = false;
+                    }
+                    
+                    updateVoteOptions();
+                }
+            }
+            
+            if (state.gameState === 'results' && !document.getElementById('resultsView').classList.contains('active')) {
+                showResults();
+            }
+        }
+
+        function updateVotingStatus() {
+            const container = document.getElementById('votingStatus');
+            const voters = state.players.filter(p => p.id !== state.currentReader);
+            
+            container.innerHTML = voters.map(p => {
+                const hasVoted = state.votes[p.id];
+                return `
+                    <div class="player-card ${hasVoted ? 'voted' : ''}" style="padding: 8px;">
+                        <div class="player-avatar" style="width: 35px; height: 35px; font-size: 1rem;">${p.name.charAt(0)}</div>
+                        <div style="font-size: 0.7rem;">${hasVoted ? '✓' : '...'}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateVoteOptions() {
+            const container = document.getElementById('voteOptions');
+            const options = state.players.filter(p => p.id !== state.currentUser?.id);
+            
+            container.innerHTML = options.map(p => `
+                <div class="vote-option" onclick="submitVote('${p.id}')" id="vote-${p.id}">
+                    <div style="font-size: 1.5rem; margin-bottom: 5px;">${p.name.charAt(0)}</div>
+                    <div style="font-weight: 600;">${p.name}</div>
+                </div>
+            `).join('');
+        }
+
+        function toggleDoubleDown() {
+            const btn = document.getElementById('doubleDownBtn');
+            btn.classList.toggle('active');
+        }
+
+        async function drawCard() {
+            const btn = document.getElementById('drawCardBtn');
+            btn.disabled = true;
+            btn.textContent = 'Drawing...';
+            
+            try {
+                const result = await makeRequest('drawCard', { roomCode: state.roomCode });
+                if (result.success) {
+                    document.getElementById('readerQuestionCard').textContent = result.question;
+                    btn.classList.add('hidden');
+                }
+            } catch (error) {
+                showToast('Failed to draw card');
+                btn.disabled = false;
+                btn.textContent = 'Draw Card';
+            }
+        }
+
+        async function submitVote(targetId) {
+            if (state.hasVoted) return;
+            
+            const doubleDown = document.getElementById('doubleDownBtn').classList.contains('active');
+            
+            document.querySelectorAll('.vote-option').forEach(el => el.classList.remove('selected'));
+            document.getElementById(`vote-${targetId}`).classList.add('selected');
+            
+            state.hasVoted = true;
+            if (doubleDown) state.doubleDownUsed = true;
+            
+            try {
+                await makeRequest('submitVote', {
+                    targetId: targetId,
+                    doubleDown: doubleDown
+                });
+                
+                document.getElementById('votingSection').style.display = 'none';
+                document.getElementById('waitingSection').style.display = 'block';
+                document.getElementById('voterStatus').textContent = 'Vote submitted!';
+                
+            } catch (error) {
+                showToast('Failed to submit vote');
+                state.hasVoted = false;
+            }
+        }
+
+        async function revealVotes() {
+            const btn = document.getElementById('revealBtn');
+            btn.disabled = true;
+            btn.textContent = 'Revealing...';
+            
+            try {
+                await makeRequest('revealVotes', { roomCode: state.roomCode });
+            } catch (error) {
+                showToast('Failed to reveal votes');
+                btn.disabled = false;
+                btn.textContent = 'Reveal Votes';
+            }
+        }
+
+        function showResults() {
+            document.getElementById('readerView').style.display = 'none';
+            document.getElementById('voterView').style.display = 'none';
+            document.getElementById('resultsView').style.display = 'block';
+            
+            document.getElementById('resultQuestion').textContent = state.currentQuestion;
+            
+            // Fetch results from server
+            fetchResults();
+        }
+
+        async function fetchResults() {
+            try {
+                const result = await makeRequest('getResults', { roomCode: state.roomCode });
+                if (!result.success) return;
+                
+                const majorityPlayer = state.players.find(p => p.id === result.majority);
+                document.getElementById('majorityTarget').textContent = majorityPlayer ? majorityPlayer.name : 'No one';
+                
+                const list = document.getElementById('resultsList');
+                const voters = Object.keys(result.votes);
+                
+                list.innerHTML = voters.map(voterId => {
+                    const voter = state.players.find(p => p.id === voterId);
+                    const vote = result.votes[voterId];
+                    const target = state.players.find(p => p.id === vote.target);
+                    const correct = vote.target === result.majority;
+                    const points = correct ? (vote.doubleDown ? 2 : 1) : 0;
+                    
+                    return `
+                        <div class="result-item ${correct ? 'correct' : 'wrong'}">
+                            <div>
+                                <div class="voter-name">${voter?.name || 'Unknown'}</div>
+                                <div class="voted-for">voted for ${target?.name || 'Unknown'}</div>
+                                ${vote.doubleDown ? '<div style="color: #f5576c; font-size: 0.75rem; margin-top: 2px;">🚀 Double Down</div>' : ''}
+                            </div>
+                            <div class="points-earned">${correct ? '+' + points : '0'}</div>
+                        </div>
+                    `;
+                }).join('');
+                
+                updateScoreboard();
+                
+            } catch (error) {
+                console.error('Failed to fetch results:', error);
+            }
+        }
+
+        function acknowledgeResults() {
+            if (state.isHost) {
+                document.getElementById('continueBtn').textContent = 'Starting next round...';
+                nextRound();
+            } else {
+                document.getElementById('continueBtn').textContent = 'Waiting for host...';
+                document.getElementById('continueBtn').disabled = true;
+            }
+        }
+
+        async function nextRound() {
+            try {
+                await makeRequest('nextRound', { roomCode: state.roomCode });
+                initGameView();
+            } catch (error) {
+                showToast('Failed to start next round');
+            }
+        }
+
+        function showWinner(winnerId) {
+            showScreen('winnerScreen');
+            
+            const winner = state.players.find(p => p.id === winnerId);
+            document.getElementById('winnerName').textContent = winner ? winner.name : 'Unknown';
+            
+            const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
+            
+            document.getElementById('finalStandings').innerHTML = sorted.map(([id, score], i) => {
+                const player = state.players.find(p => p.id === id);
+                return `
+                    <div class="standing-item">
+                        <div class="standing-rank">#${i + 1}</div>
+                        <div class="standing-name">${player?.name || 'Unknown'}</div>
+                        <div class="standing-score">${score} pts</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function leaveRoom() {
+            if (syncInterval) clearInterval(syncInterval);
+            
+            if (state.roomCode && state.currentUser) {
+                try {
+                    await makeRequest('leaveRoom', {
+                        roomCode: state.roomCode,
+                        userId: state.currentUser.id,
+                        wasHost: state.isHost
+                    });
+                } catch (e) {
+                    console.error('Error leaving room:', e);
+                }
+            }
+            
+            // Reset state
+            state.currentUser = null;
+            state.roomCode = null;
+            state.isHost = false;
+            state.players = [];
+            state.gameState = 'waiting';
+            state.doubleDownUsed = false;
+            state.hasVoted = false;
+            
+            showScreen('joinScreen');
+            document.getElementById('usernameInput').value = '';
+            document.getElementById('roomCodeInput').value = '';
+            updateConnectionStatus('connecting');
+        }
+
+        function playAgain() {
+            showScreen('lobbyScreen');
+            state.gameState = 'waiting';
+            state.doubleDownUsed = false;
+            state.scores = {};
+            updateLobby();
+            startSync();
+        }
+
+        // Admin Functions
+        function showAdminLogin() {
+            showScreen('adminLoginScreen');
+        }
+
+        function adminLogin() {
+            const password = document.getElementById('adminPassword').value;
+            if (password === CONFIG.ADMIN_PASSWORD) {
+                showScreen('adminScreen');
+                loadAdminData();
+                document.getElementById('adminError').classList.remove('show');
+            } else {
+                showError('adminError', 'Wrong password');
+            }
+        }
+
+        function logoutAdmin() {
+            showScreen('joinScreen');
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tab + 'Tab').classList.add('active');
+        }
+
+        async function loadAdminData() {
+            await updateAdminRooms();
+            updateAdminQuestions();
+        }
+
+        async function updateAdminRooms() {
+            const container = document.getElementById('adminRoomList');
+            container.innerHTML = '<div class="empty-state"><div class="loading"></div><p>Loading rooms...</p></div>';
+            
+            try {
+                const result = await makeRequest('getAllRooms');
+                
+                if (!result.success || result.rooms.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📭</div>
+                            <p>No active rooms</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = result.rooms.map(r => `
+                    <div class="admin-user-item">
+                        <div>
+                            <div style="font-weight: bold; color: #feca57;">${r.code}</div>
+                            <div style="font-size: 0.85rem; color: #a0a0a0;">
+                                ${r.players.length} players • ${r.gameState} • Round ${r.round || 0}
+                            </div>
+                        </div>
+                        <button class="remove-btn" onclick="deleteRoom('${r.code}')">Delete</button>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                container.innerHTML = '<div class="empty-state"><p>Failed to load rooms</p></div>';
+            }
+        }
+
+        function updateAdminQuestions() {
+            const container = document.getElementById('adminQuestionList');
+            container.innerHTML = state.questions.map((q, i) => `
+                <div class="admin-user-item" style="align-items: flex-start;">
+                    <div style="flex: 1; padding-right: 10px; font-size: 0.9rem;">${q}</div>
+                </div>
+            `).join('');
+        }
+
+        async function clearAllRooms() {
+            if (!confirm('Delete ALL rooms? This cannot be undone.')) return;
+            
+            try {
+                await makeRequest('clearAllRooms');
+                await updateAdminRooms();
+                showToast('All rooms cleared');
+            } catch (error) {
+                showToast('Failed to clear rooms');
+            }
+        }
+
+        async function deleteRoom(code) {
+            try {
+                await makeRequest('deleteRoom', { roomCode: code });
+                await updateAdminRooms();
+                showToast('Room deleted');
+            } catch (error) {
+                showToast('Failed to delete room');
+            }
+        }
+
+        async function addQuestion() {
+            const input = document.getElementById('newQuestionInput');
+            const q = input.value.trim();
+            
+            if (!q) return;
+            
+            try {
+                await makeRequest('addQuestion', { 
+                    roomCode: 'GLOBAL',
+                    question: q 
+                });
+                
+                state.questions.push(q);
+                input.value = '';
+                updateAdminQuestions();
+                showToast('Question added!');
+            } catch (error) {
+                showToast('Failed to add question');
+            }
+        }
+
+        // Utility Functions
+        function loadQuestions() {
+            // Default questions are hardcoded, but we can load custom ones from server
+            state.questions = [
+                "Who would survive the longest in a zombie apocalypse?",
+                "Who has the worst taste in romantic partners?",
+                "Who would sell their soul for the least amount of money?",
+                "Who is most likely to fake their own death?",
+                "Who would be the worst parent?",
+                "Who has done the most 'walks of shame'?",
+                "Who would start a cult and actually succeed?",
+                "Who is most likely to get catfished online?",
+                "Who would throw their friend under the bus to save themselves?",
+                "Who has the most embarrassing search history?",
+                "Who would be the first to die in a horror movie?",
+                "Who is most likely to cry during a commercial?",
+                "Who would get into a fight at a family reunion?",
+                "Who would be friends with a dictator for the perks?",
+                "Who has the worst luck in general?",
+                "Who would snitch on their friends to the police?",
+                "Who is most likely to develop a gambling addiction?",
+                "Who would ghost their own wedding?",
+                "Who has the most skeletons in their closet?",
+                "Who would fail a lie detector test immediately?",
+                "Who is most likely to get banned from a casino?",
+                "Who would believe the most ridiculous conspiracy theory?",
+                "Who has the worst impulse control?",
+                "Who would accidentally start a fire and blame someone else?",
+                "Who is most likely to have a secret family?",
+                "Who would eat someone else's lunch from the office fridge?",
+                "Who has the worst road rage?",
+                "Who would cut in line and not feel bad about it?",
+                "Who is most likely to get lost in their own neighborhood?",
+                "Who would forget their own birthday?"
+            ];
+        }
+
+        // Prevent zoom on double tap for mobile
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+
+        // Handle page visibility changes (pause sync when hidden)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (syncInterval) clearInterval(syncInterval);
+            } else {
+                if (state.roomCode) startSync();
+            }
+        });
+    </script>
+</body>
+</html>
