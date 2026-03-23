@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Who's The Worst?</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -68,7 +69,7 @@
             backdrop-filter: blur(10px);
         }
 
-        input[type="text"], input[type="password"], input[type="number"] {
+        input[type="text"], input[type="password"] {
             width: 100%;
             padding: 15px;
             border: 2px solid rgba(255, 255, 255, 0.1);
@@ -148,12 +149,6 @@
             display: block;
         }
 
-        .success {
-            color: #2ecc71;
-            text-align: center;
-            margin-top: 10px;
-        }
-
         .loading {
             display: inline-block;
             width: 20px;
@@ -186,6 +181,7 @@
             letter-spacing: 8px;
             font-family: 'Courier New', monospace;
             margin: 10px 0;
+            cursor: pointer;
         }
 
         .players-grid {
@@ -202,7 +198,6 @@
             text-align: center;
             border: 2px solid transparent;
             transition: all 0.3s;
-            position: relative;
         }
 
         .player-card.current-user {
@@ -213,11 +208,6 @@
         .player-card.voted {
             border-color: #2ecc71;
             background: rgba(46, 204, 113, 0.1);
-        }
-
-        .player-card.reader {
-            border-color: #9b59b6;
-            background: rgba(155, 89, 182, 0.1);
         }
 
         .player-avatar {
@@ -436,16 +426,6 @@
             font-size: 1.1rem;
         }
 
-        .admin-badge {
-            display: inline-block;
-            background: #9b59b6;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 0.7rem;
-            margin-left: 5px;
-        }
-
         .winner-display {
             text-align: center;
             padding: 40px 20px;
@@ -510,76 +490,6 @@
             font-size: 1.2rem;
         }
 
-        .tabs {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 20px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 12px;
-            padding: 5px;
-        }
-
-        .tab {
-            flex: 1;
-            padding: 12px;
-            background: none;
-            border: none;
-            color: #a0a0a0;
-            cursor: pointer;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            margin: 0;
-            text-transform: none;
-            letter-spacing: 0;
-        }
-
-        .tab.active {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .admin-user-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            background: rgba(255, 255, 255, 0.05);
-            margin-bottom: 10px;
-            border-radius: 10px;
-        }
-
-        .remove-btn {
-            background: #ff4757;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            width: auto;
-            margin: 0;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #a0a0a0;
-        }
-
-        .empty-state-icon {
-            font-size: 3rem;
-            margin-bottom: 10px;
-            opacity: 0.5;
-        }
-
         .connection-status {
             position: fixed;
             top: 10px;
@@ -592,7 +502,6 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            transition: all 0.3s;
         }
 
         .connection-status.online {
@@ -675,34 +584,8 @@
             font-weight: 600;
         }
 
-        .network-error {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.9);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 3000;
-            flex-direction: column;
-            padding: 20px;
-        }
-
-        .network-error.show {
-            display: flex;
-        }
-
-        .network-error h2 {
-            color: #ff6b6b;
-            margin-bottom: 10px;
-        }
-
-        .network-error p {
-            color: #a0a0a0;
-            text-align: center;
-            margin-bottom: 20px;
+        .hidden {
+            display: none !important;
         }
 
         @media (max-width: 400px) {
@@ -727,15 +610,34 @@
         <span>Connecting...</span>
     </div>
 
-    <div id="networkError" class="network-error">
-        <h2>⚠️ Connection Lost</h2>
-        <p>Having trouble connecting to the game server.<br>Check your internet and try again.</p>
-        <button class="btn-primary" onclick="retryConnection()" style="width: auto; padding: 12px 30px;">Retry</button>
-    </div>
-
     <div class="container">
+        <!-- Setup Screen (Enter Supabase credentials) -->
+        <div id="setupScreen" class="screen active">
+            <h1>⚙️ Setup</h1>
+            <p class="subtitle">Connect to your Supabase project</p>
+            
+            <div class="card">
+                <input type="text" id="supabaseUrl" placeholder="Supabase URL (e.g., https://xxxx.supabase.co)" autocomplete="off">
+                <input type="text" id="supabaseKey" placeholder="Supabase Anon Key" autocomplete="off">
+                <button class="btn-primary" onclick="connectToSupabase()" id="connectBtn">
+                    Connect
+                </button>
+                <div id="setupError" class="error"></div>
+            </div>
+            
+            <div class="instructions">
+                <h3>How to get credentials:</h3>
+                <ol>
+                    <li>Go to <a href="https://supabase.com" target="_blank" style="color: #3ec1d3;">supabase.com</a> and create a project</li>
+                    <li>In your project, go to Settings → API</li>
+                    <li>Copy the <strong>URL</strong> and <strong>anon public</strong> key</li>
+                    <li>Paste them here</li>
+                </ol>
+            </div>
+        </div>
+
         <!-- Join Screen -->
-        <div id="joinScreen" class="screen active">
+        <div id="joinScreen" class="screen">
             <h1>👑 Who's The Worst?</h1>
             <p class="subtitle">The party game of savage voting</p>
             
@@ -762,64 +664,10 @@
                     <li>First to <span class="highlight">7 points</span> wins</li>
                 </ol>
             </div>
-
-            <button class="btn-secondary" onclick="showAdminLogin()" style="margin-top: 10px;">
-                Admin Access
-            </button>
-        </div>
-
-        <!-- Admin Login -->
-        <div id="adminLoginScreen" class="screen">
-            <h1>🔐 Admin</h1>
-            <div class="card">
-                <input type="password" id="adminPassword" placeholder="Admin password">
-                <button class="btn-primary" onclick="adminLogin()">Login</button>
-                <button class="btn-secondary" onclick="showScreen('joinScreen')">Back</button>
-                <div id="adminError" class="error"></div>
-            </div>
-        </div>
-
-        <!-- Admin Dashboard -->
-        <div id="adminScreen" class="screen">
-            <h1>⚙️ Admin</h1>
             
-            <div class="tabs">
-                <button class="tab active" onclick="switchTab('rooms')">Rooms</button>
-                <button class="tab" onclick="switchTab('questions')">Questions</button>
-            </div>
-
-            <div id="roomsTab" class="tab-content active">
-                <div class="card">
-                    <h3 style="margin-bottom: 15px; color: #feca57;">Active Rooms</h3>
-                    <div id="adminRoomList">
-                        <div class="empty-state">
-                            <div class="empty-state-icon">📭</div>
-                            <p>Loading rooms...</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <h3 style="margin-bottom: 15px; color: #ff6b6b;">Danger Zone</h3>
-                    <button class="btn-danger" onclick="clearAllRooms()">Clear All Rooms</button>
-                </div>
-            </div>
-
-            <div id="questionsTab" class="tab-content">
-                <div class="card">
-                    <h3 style="margin-bottom: 15px; color: #feca57;">Game Questions</h3>
-                    <div id="adminQuestionList" style="max-height: 400px; overflow-y: auto;">
-                        Loading...
-                    </div>
-                </div>
-                <div class="card">
-                    <h3 style="margin-bottom: 15px;">Add Question</h3>
-                    <input type="text" id="newQuestionInput" placeholder="Who would...?" maxlength="200">
-                    <button class="btn-primary" onclick="addQuestion()">Add Question</button>
-                </div>
-            </div>
-
-            <button class="btn-secondary" onclick="logoutAdmin()" style="margin-top: 10px;">Logout</button>
+            <button class="btn-secondary" onclick="backToSetup()" style="margin-top: 10px;">
+                Change Connection
+            </button>
         </div>
 
         <!-- Lobby Screen -->
@@ -828,8 +676,8 @@
             
             <div class="game-code-display">
                 <div style="font-size: 0.9rem; color: #a0a0a0; margin-bottom: 5px;">ROOM CODE</div>
-                <div class="game-code" id="displayRoomCode">---</div>
-                <div style="font-size: 0.8rem; color: #a0a0a0;">Share this with friends!</div>
+                <div class="game-code" id="displayRoomCode" onclick="copyRoomCode()">---</div>
+                <div style="font-size: 0.8rem; color: #a0a0a0; margin-top: 5px;">Tap to copy</div>
             </div>
 
             <div class="card">
@@ -864,9 +712,7 @@
 
         <!-- Game Screen -->
         <div id="gameScreen" class="screen">
-            <div class="scoreboard" id="scoreboard">
-                <!-- Scores populated here -->
-            </div>
+            <div class="scoreboard" id="scoreboard"></div>
 
             <!-- Reader View -->
             <div id="readerView" style="display: none;">
@@ -886,9 +732,7 @@
 
                 <div class="card" style="margin-top: 20px;">
                     <h4 style="margin-bottom: 15px; color: #feca57;">Voting Status</h4>
-                    <div id="votingStatus" class="players-grid" style="grid-template-columns: repeat(4, 1fr);">
-                        <!-- Voting status -->
-                    </div>
+                    <div id="votingStatus" class="players-grid" style="grid-template-columns: repeat(4, 1fr);"></div>
                 </div>
             </div>
 
@@ -913,9 +757,7 @@
 
                 <div id="votingSection" style="display: none;">
                     <h4 style="margin-bottom: 10px; text-align: center;">Who fits best?</h4>
-                    <div class="vote-grid" id="voteOptions">
-                        <!-- Vote options -->
-                    </div>
+                    <div class="vote-grid" id="voteOptions"></div>
                 </div>
 
                 <div id="waitingSection" style="display: none; text-align: center; padding: 40px;">
@@ -930,19 +772,13 @@
                     🎉 Round Results
                 </div>
                 
-                <div class="question-card" id="resultQuestion" style="font-size: 1.1rem; min-height: auto; padding: 20px;">
-                    <!-- Question -->
-                </div>
+                <div class="question-card" id="resultQuestion" style="font-size: 1.1rem; min-height: auto; padding: 20px;"></div>
 
-                <div class="results-container" id="resultsList">
-                    <!-- Results -->
-                </div>
+                <div class="results-container" id="resultsList"></div>
 
                 <div class="card" style="text-align: center;">
                     <h4 style="color: #feca57; margin-bottom: 10px;">Majority Voted For:</h4>
-                    <div id="majorityTarget" style="font-size: 1.5rem; font-weight: bold; color: #2ecc71;">
-                        <!-- Target -->
-                    </div>
+                    <div id="majorityTarget" style="font-size: 1.5rem; font-weight: bold; color: #2ecc71;"></div>
                 </div>
 
                 <button class="btn-primary" onclick="acknowledgeResults()" id="continueBtn">
@@ -958,9 +794,7 @@
                 <div class="winner-name" id="winnerName">Name</div>
                 <div class="winner-text">is officially the worst! 🎉</div>
                 
-                <div class="final-standings" id="finalStandings">
-                    <!-- Standings -->
-                </div>
+                <div class="final-standings" id="finalStandings"></div>
                 
                 <button class="btn-primary" onclick="playAgain()">Play Again</button>
                 <button class="btn-secondary" onclick="leaveRoom()">Leave Room</button>
@@ -973,15 +807,46 @@
     <script>
         // Game Configuration
         const CONFIG = {
-            WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzkjk2Qbn-xkPGLd0isEAjnhGyhkaGSON3UQsr3boJ0dLXgH6KnWxnqd8QRrNt1IjEVwQ/exec',
-            SYNC_INTERVAL: 2000,
             MIN_PLAYERS: 3,
             POINTS_TO_WIN: 7,
-            ADMIN_PASSWORD: 'worst123',
-            REQUEST_TIMEOUT: 10000
+            QUESTIONS: [
+                "Who would survive the longest in a zombie apocalypse?",
+                "Who has the worst taste in romantic partners?",
+                "Who would sell their soul for the least amount of money?",
+                "Who is most likely to fake their own death?",
+                "Who would be the worst parent?",
+                "Who has done the most 'walks of shame'?",
+                "Who would start a cult and actually succeed?",
+                "Who is most likely to get catfished online?",
+                "Who would throw their friend under the bus to save themselves?",
+                "Who has the most embarrassing search history?",
+                "Who would be the first to die in a horror movie?",
+                "Who is most likely to cry during a commercial?",
+                "Who would get into a fight at a family reunion?",
+                "Who would be friends with a dictator for the perks?",
+                "Who has the worst luck in general?",
+                "Who would snitch on their friends to the police?",
+                "Who is most likely to develop a gambling addiction?",
+                "Who would ghost their own wedding?",
+                "Who has the most skeletons in their closet?",
+                "Who would fail a lie detector test immediately?",
+                "Who is most likely to get banned from a casino?",
+                "Who would believe the most ridiculous conspiracy theory?",
+                "Who has the worst impulse control?",
+                "Who would accidentally start a fire and blame someone else?",
+                "Who is most likely to have a secret family?",
+                "Who would eat someone else's lunch from the office fridge?",
+                "Who has the worst road rage?",
+                "Who would cut in line and not feel bad about it?",
+                "Who is most likely to get lost in their own neighborhood?",
+                "Who would forget their own birthday?"
+            ]
         };
 
-        // Game State
+        // Global State
+        let supabase = null;
+        let realtimeChannel = null;
+        
         const state = {
             currentUser: null,
             roomCode: null,
@@ -994,139 +859,129 @@
             scores: {},
             doubleDownUsed: false,
             hasVoted: false,
-            round: 1,
-            questions: [],
-            lastSync: 0,
-            isConnected: false
+            round: 1
         };
 
         // Initialize
-        let syncInterval;
-        let requestQueue = [];
-        
         window.onload = function() {
-            loadQuestions();
-            showScreen('joinScreen');
-            testConnection();
+            // Check for saved credentials
+            const savedUrl = localStorage.getItem('supabaseUrl');
+            const savedKey = localStorage.getItem('supabaseKey');
+            
+            if (savedUrl && savedKey) {
+                document.getElementById('supabaseUrl').value = savedUrl;
+                document.getElementById('supabaseKey').value = savedKey;
+                connectToSupabase();
+            }
         };
 
-        // Network Functions
-        async function makeRequest(action, data = {}) {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
+        // Supabase Connection
+        async function connectToSupabase() {
+            const url = document.getElementById('supabaseUrl').value.trim();
+            const key = document.getElementById('supabaseKey').value.trim();
+            const btn = document.getElementById('connectBtn');
+            
+            if (!url || !key) {
+                showError('setupError', 'Please enter both URL and Key');
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.innerHTML = 'Connecting... <div class="loading"></div>';
             
             try {
-                const response = await fetch(CONFIG.WEB_APP_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        action: action,
-                        roomCode: state.roomCode || data.roomCode,
-                        userId: state.currentUser?.id,
-                        userName: state.currentUser?.name,
-                        ...data
-                    }),
-                    signal: controller.signal
-                });
+                // Initialize Supabase client
+                supabase = window.supabase.createClient(url, key);
                 
-                clearTimeout(timeoutId);
+                // Test connection
+                const { data, error } = await supabase.from('rooms').select('count', { count: 'exact', head: true });
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                if (error && error.code !== 'PGRST116') { // PGRST116 = table doesn't exist, which is OK
+                    throw error;
                 }
                 
-                const result = await response.json();
+                // Save credentials
+                localStorage.setItem('supabaseUrl', url);
+                localStorage.setItem('supabaseKey', key);
                 
-                if (!state.isConnected) {
-                    state.isConnected = true;
-                    updateConnectionStatus(true);
-                    document.getElementById('networkError').classList.remove('show');
-                }
-                
-                return result;
+                updateConnectionStatus(true);
+                showScreen('joinScreen');
+                showToast('Connected to Supabase!');
                 
             } catch (error) {
-                clearTimeout(timeoutId);
-                
-                if (error.name === 'AbortError') {
-                    console.error('Request timeout');
-                } else {
-                    console.error('Request failed:', error);
-                }
-                
-                state.isConnected = false;
-                updateConnectionStatus(false);
-                
-                // Show error if we're in a game
-                if (state.roomCode) {
-                    document.getElementById('networkError').classList.add('show');
-                }
-                
-                throw error;
+                console.error('Connection error:', error);
+                showError('setupError', 'Failed to connect: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Connect';
             }
         }
 
-        async function testConnection() {
-            try {
-                updateConnectionStatus('connecting');
-                const result = await makeRequest('ping');
-                if (result.success) {
-                    updateConnectionStatus(true);
-                    showToast('Connected to server!');
-                }
-            } catch (e) {
-                updateConnectionStatus(false);
-                console.log('Initial connection test failed, will retry');
+        function backToSetup() {
+            showScreen('setupScreen');
+            if (realtimeChannel) {
+                supabase.removeChannel(realtimeChannel);
+                realtimeChannel = null;
             }
         }
 
-        function retryConnection() {
-            document.getElementById('networkError').classList.remove('show');
-            testConnection();
-            if (state.roomCode) {
-                syncGameState();
-            }
-        }
-
-        // Screen Management
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
-        }
-
-        function showToast(message, duration = 3000) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), duration);
-        }
-
-        function showError(elementId, message) {
-            const el = document.getElementById(elementId);
-            el.textContent = message;
-            el.classList.add('show');
-            setTimeout(() => el.classList.remove('show'), 5000);
-        }
-
-        function updateConnectionStatus(status) {
-            const el = document.getElementById('connectionStatus');
-            el.classList.remove('online', 'offline', 'connecting');
+        // Room Management
+        async function createRoom() {
+            const username = document.getElementById('usernameInput').value.trim();
             
-            if (status === true) {
-                el.classList.add('online');
-                el.innerHTML = '<div class="pulse-dot"></div><span>Live</span>';
-            } else if (status === 'connecting') {
-                el.classList.add('connecting');
-                el.innerHTML = '<div class="pulse-dot"></div><span>Connecting...</span>';
-            } else {
-                el.classList.add('offline');
-                el.innerHTML = '<div class="pulse-dot"></div><span>Offline</span>';
+            if (!username) {
+                showError('joinError', 'Enter your name first');
+                return;
+            }
+            
+            if (username.length < 2) {
+                showError('joinError', 'Name too short');
+                return;
+            }
+            
+            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+            
+            try {
+                // Create room in Supabase
+                const { data: room, error } = await supabase
+                    .from('rooms')
+                    .insert({
+                        code: code,
+                        game_state: 'waiting',
+                        current_round: 1,
+                        created_at: new Date().toISOString()
+                    })
+                    .select()
+                    .single();
+                
+                if (error) throw error;
+                
+                // Create the first player
+                const { data: player, error: playerError } = await supabase
+                    .from('players')
+                    .insert({
+                        room_id: room.id,
+                        name: username,
+                        is_host: true,
+                        double_down_used: false,
+                        joined_at: new Date().toISOString()
+                    })
+                    .select()
+                    .single();
+                
+                if (playerError) throw playerError;
+                
+                state.currentUser = player;
+                state.roomCode = code;
+                state.isHost = true;
+                
+                enterLobby(room.id);
+                
+            } catch (error) {
+                console.error('Create room error:', error);
+                showError('joinError', 'Failed to create room: ' + error.message);
             }
         }
 
-        // Join/Create Functions
         async function joinGame() {
             const username = document.getElementById('usernameInput').value.trim();
             const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
@@ -1140,54 +995,65 @@
             btn.innerHTML = 'Joining... <div class="loading"></div>';
             
             try {
-                const result = await makeRequest('joinRoom', {
-                    roomCode: roomCode,
-                    userName: username
-                });
+                // Find room
+                const { data: room, error: roomError } = await supabase
+                    .from('rooms')
+                    .select('*')
+                    .eq('code', roomCode)
+                    .single();
                 
-                if (!result.success) {
-                    showError('joinError', result.error || 'Failed to join');
-                    btn.disabled = false;
-                    btn.textContent = 'Join Game';
-                    return;
+                if (roomError || !room) {
+                    throw new Error('Room not found');
                 }
                 
-                state.currentUser = result.player;
-                state.roomCode = roomCode;
-                state.isHost = result.player.isHost;
-                state.players = result.room.players;
+                if (room.game_state !== 'waiting') {
+                    throw new Error('Game already started');
+                }
                 
-                enterLobby();
+                // Check existing players count
+                const { data: existingPlayers, error: countError } = await supabase
+                    .from('players')
+                    .select('*')
+                    .eq('room_id', room.id);
+                
+                if (existingPlayers && existingPlayers.length >= 15) {
+                    throw new Error('Room full');
+                }
+                
+                // Check name uniqueness
+                if (existingPlayers && existingPlayers.find(p => p.name === username)) {
+                    throw new Error('Name taken');
+                }
+                
+                // Create player
+                const { data: player, error: playerError } = await supabase
+                    .from('players')
+                    .insert({
+                        room_id: room.id,
+                        name: username,
+                        is_host: existingPlayers.length === 0,
+                        double_down_used: false,
+                        joined_at: new Date().toISOString()
+                    })
+                    .select()
+                    .single();
+                
+                if (playerError) throw playerError;
+                
+                state.currentUser = player;
+                state.roomCode = roomCode;
+                state.isHost = existingPlayers.length === 0;
+                
+                enterLobby(room.id);
                 
             } catch (error) {
-                showError('joinError', 'Network error. Please try again.');
+                showError('joinError', error.message);
                 btn.disabled = false;
                 btn.textContent = 'Join Game';
             }
         }
 
-        async function createRoom() {
-            const username = document.getElementById('usernameInput').value.trim();
-            
-            if (!username) return showError('joinError', 'Enter your name first');
-            if (username.length < 2) return showError('joinError', 'Name too short');
-            
-            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-            
-            try {
-                // Create room
-                await makeRequest('createRoom', { roomCode: code });
-                
-                // Join it
-                document.getElementById('roomCodeInput').value = code;
-                await joinGame();
-                
-            } catch (error) {
-                showError('joinError', 'Failed to create room. Please try again.');
-            }
-        }
-
-        function enterLobby() {
+        function enterLobby(roomId) {
             showScreen('lobbyScreen');
             document.getElementById('displayRoomCode').textContent = state.roomCode;
             
@@ -1199,62 +1065,102 @@
                 document.getElementById('playerRole').textContent = 'Player';
             }
             
-            updateLobby();
-            startSync();
+            subscribeToRoom(roomId);
         }
 
-        function startSync() {
-            if (syncInterval) clearInterval(syncInterval);
-            syncInterval = setInterval(syncGameState, CONFIG.SYNC_INTERVAL);
-            syncGameState();
+        // Real-time Subscription
+        function subscribeToRoom(roomId) {
+            // Subscribe to room changes
+            realtimeChannel = supabase
+                .channel('room:' + roomId)
+                .on('postgres_changes', 
+                    { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId },
+                    (payload) => handleRoomChange(payload.new)
+                )
+                .on('postgres_changes',
+                    { event: '*', schema: 'public', table: 'players', filter: 'room_id=eq.' + roomId },
+                    () => loadPlayers(roomId)
+                )
+                .on('postgres_changes',
+                    { event: '*', schema: 'public', table: 'votes', filter: 'room_id=eq.' + roomId },
+                    () => loadVotes(roomId)
+                )
+                .subscribe((status) => {
+                    console.log('Subscription status:', status);
+                    if (status === 'SUBSCRIBED') {
+                        updateConnectionStatus(true);
+                        loadPlayers(roomId);
+                    }
+                });
         }
 
-        async function syncGameState() {
-            if (!state.roomCode) return;
+        async function loadPlayers(roomId) {
+            const { data: players, error } = await supabase
+                .from('players')
+                .select('*')
+                .eq('room_id', roomId)
+                .order('joined_at', { ascending: true });
             
-            try {
-                const result = await makeRequest('getRoom', { roomCode: state.roomCode });
-                
-                if (!result.success || !result.room) {
-                    showToast('Room not found');
-                    return;
-                }
-                
-                const room = result.room;
-                
-                // Update state
-                state.players = room.players;
-                state.gameState = room.gameState;
-                state.currentQuestion = room.currentQuestion;
-                state.currentReader = room.currentReader;
-                state.votes = room.votes || {};
-                state.scores = room.scores || {};
-                state.round = room.round || 1;
-                
-                // Update UI
+            if (error) return;
+            
+            state.players = players;
+            updateLobby();
+            
+            // Update current user data
+            const updatedMe = players.find(p => p.id === state.currentUser?.id);
+            if (updatedMe) {
+                state.currentUser = updatedMe;
+                state.isHost = updatedMe.is_host;
+            }
+        }
+
+        async function loadVotes(roomId) {
+            const { data: votes, error } = await supabase
+                .from('votes')
+                .select('*')
+                .eq('room_id', roomId)
+                .eq('round', state.round);
+            
+            if (error) return;
+            
+            state.votes = {};
+            votes.forEach(v => {
+                state.votes[v.player_id] = {
+                    target: v.target_id,
+                    doubleDown: v.double_down
+                };
+            });
+            
+            updateVotingStatus();
+        }
+
+        function handleRoomChange(room) {
+            if (!room) return;
+            
+            state.gameState = room.game_state;
+            state.currentQuestion = room.current_question;
+            state.currentReader = room.current_reader;
+            state.round = room.current_round;
+            
+            // Update scores from room data
+            if (room.scores) {
+                state.scores = room.scores;
+            }
+            
+            // Route to appropriate screen
+            if (state.gameState === 'playing' || state.gameState === 'results') {
                 if (document.getElementById('lobbyScreen').classList.contains('active')) {
-                    updateLobby();
-                    
-                    if (state.gameState === 'playing') {
-                        showScreen('gameScreen');
-                        initGameView();
-                    }
-                } else if (document.getElementById('gameScreen').classList.contains('active')) {
-                    updateGameView();
-                    
-                    // Check for winner
-                    if (state.scores) {
-                        const winner = Object.entries(state.scores).find(([id, score]) => 
-                            score >= CONFIG.POINTS_TO_WIN
-                        );
-                        if (winner && !document.getElementById('winnerScreen').classList.contains('active')) {
-                            showWinner(winner[0]);
-                        }
-                    }
+                    showScreen('gameScreen');
                 }
-                
-            } catch (error) {
-                console.error('Sync failed:', error);
+                updateGameView();
+            }
+            
+            // Check for winner
+            if (state.scores && Object.entries(state.scores).length > 0) {
+                const winner = Object.entries(state.scores).find(([id, score]) => score >= CONFIG.POINTS_TO_WIN);
+                if (winner && !document.getElementById('winnerScreen').classList.contains('active')) {
+                    showWinner(winner[0]);
+                }
             }
         }
 
@@ -1263,18 +1169,13 @@
             
             const grid = document.getElementById('lobbyPlayers');
             if (state.players.length === 0) {
-                grid.innerHTML = `
-                    <div class="empty-state" style="grid-column: 1/-1;">
-                        <div class="empty-state-icon">👥</div>
-                        <p>No players yet</p>
-                    </div>
-                `;
+                grid.innerHTML = '<div class="empty-state" style="grid-column: 1/-1;"><div class="empty-state-icon">👥</div><p>No players yet</p></div>';
             } else {
                 grid.innerHTML = state.players.map(p => `
                     <div class="player-card ${p.id === state.currentUser?.id ? 'current-user' : ''}">
                         <div class="player-avatar">${p.name.charAt(0).toUpperCase()}</div>
                         <div class="player-name">${p.name}</div>
-                        <div class="player-status">${p.isHost ? '👑 Host' : 'Player'}</div>
+                        <div class="player-status">${p.is_host ? '👑 Host' : 'Player'}</div>
                     </div>
                 `).join('');
             }
@@ -1303,11 +1204,30 @@
             btn.textContent = 'Starting...';
             
             try {
-                await makeRequest('startGame', { roomCode: state.roomCode });
+                const roomId = state.currentUser.room_id;
+                
+                // Initialize scores
+                const scores = {};
+                state.players.forEach(p => scores[p.id] = 0);
+                
+                // Update room
+                const { error } = await supabase
+                    .from('rooms')
+                    .update({
+                        game_state: 'playing',
+                        current_reader: state.players[0]?.id,
+                        scores: scores,
+                        started_at: new Date().toISOString()
+                    })
+                    .eq('id', roomId);
+                
+                if (error) throw error;
+                
                 showScreen('gameScreen');
                 initGameView();
+                
             } catch (error) {
-                showToast('Failed to start game');
+                showToast('Failed to start: ' + error.message);
                 btn.disabled = false;
                 btn.textContent = 'Start Game';
             }
@@ -1368,12 +1288,12 @@
                     document.getElementById('readerQuestionCard').textContent = state.currentQuestion;
                     document.getElementById('drawCardBtn').classList.add('hidden');
                     
-                    const allVoted = Object.keys(state.votes).length >= state.players.length - 1;
-                    const revealBtn = document.getElementById('revealBtn');
+                    const voters = state.players.filter(p => p.id !== state.currentReader);
+                    const allVoted = voters.every(p => state.votes[p.id]);
                     
+                    const revealBtn = document.getElementById('revealBtn');
                     if (allVoted && revealBtn.classList.contains('hidden')) {
                         revealBtn.classList.remove('hidden');
-                        revealBtn.classList.add('pulse');
                         showToast('Everyone voted!');
                     }
                     
@@ -1387,7 +1307,7 @@
                     document.getElementById('votingSection').style.display = 'block';
                     
                     const ddBtn = document.getElementById('doubleDownBtn');
-                    if (state.doubleDownUsed) {
+                    if (state.currentUser?.double_down_used) {
                         ddBtn.classList.add('used');
                         ddBtn.disabled = true;
                     } else {
@@ -1399,7 +1319,7 @@
                 }
             }
             
-            if (state.gameState === 'results' && !document.getElementById('resultsView').classList.contains('active')) {
+            if (state.gameState === 'results') {
                 showResults();
             }
         }
@@ -1442,13 +1362,20 @@
             btn.textContent = 'Drawing...';
             
             try {
-                const result = await makeRequest('drawCard', { roomCode: state.roomCode });
-                if (result.success) {
-                    document.getElementById('readerQuestionCard').textContent = result.question;
-                    btn.classList.add('hidden');
-                }
+                const question = CONFIG.QUESTIONS[Math.floor(Math.random() * CONFIG.QUESTIONS.length)];
+                
+                const { error } = await supabase
+                    .from('rooms')
+                    .update({ current_question: question })
+                    .eq('id', state.currentUser.room_id);
+                
+                if (error) throw error;
+                
+                document.getElementById('readerQuestionCard').textContent = question;
+                btn.classList.add('hidden');
+                
             } catch (error) {
-                showToast('Failed to draw card');
+                showToast('Failed to draw card: ' + error.message);
                 btn.disabled = false;
                 btn.textContent = 'Draw Card';
             }
@@ -1462,21 +1389,34 @@
             document.querySelectorAll('.vote-option').forEach(el => el.classList.remove('selected'));
             document.getElementById(`vote-${targetId}`).classList.add('selected');
             
-            state.hasVoted = true;
-            if (doubleDown) state.doubleDownUsed = true;
-            
             try {
-                await makeRequest('submitVote', {
-                    targetId: targetId,
-                    doubleDown: doubleDown
-                });
+                const { error } = await supabase
+                    .from('votes')
+                    .insert({
+                        room_id: state.currentUser.room_id,
+                        player_id: state.currentUser.id,
+                        target_id: targetId,
+                        round: state.round,
+                        double_down: doubleDown
+                    });
                 
+                if (error) throw error;
+                
+                // Mark double down as used if applicable
+                if (doubleDown) {
+                    await supabase
+                        .from('players')
+                        .update({ double_down_used: true })
+                        .eq('id', state.currentUser.id);
+                }
+                
+                state.hasVoted = true;
                 document.getElementById('votingSection').style.display = 'none';
                 document.getElementById('waitingSection').style.display = 'block';
                 document.getElementById('voterStatus').textContent = 'Vote submitted!';
                 
             } catch (error) {
-                showToast('Failed to submit vote');
+                showToast('Failed to vote: ' + error.message);
                 state.hasVoted = false;
             }
         }
@@ -1487,9 +1427,47 @@
             btn.textContent = 'Revealing...';
             
             try {
-                await makeRequest('revealVotes', { roomCode: state.roomCode });
+                const roomId = state.currentUser.room_id;
+                
+                // Count votes
+                const voteCounts = {};
+                Object.values(state.votes).forEach(v => {
+                    voteCounts[v.target] = (voteCounts[v.target] || 0) + 1;
+                });
+                
+                // Find majority
+                let maxVotes = 0;
+                let majority = null;
+                Object.entries(voteCounts).forEach(([target, count]) => {
+                    if (count > maxVotes) {
+                        maxVotes = count;
+                        majority = target;
+                    }
+                });
+                
+                // Calculate new scores
+                const newScores = { ...state.scores };
+                Object.entries(state.votes).forEach(([voterId, vote]) => {
+                    if (vote.target === majority) {
+                        const points = vote.doubleDown ? 2 : 1;
+                        newScores[voterId] = (newScores[voterId] || 0) + points;
+                    }
+                });
+                
+                // Update room
+                const { error } = await supabase
+                    .from('rooms')
+                    .update({
+                        game_state: 'results',
+                        scores: newScores,
+                        last_majority: majority
+                    })
+                    .eq('id', roomId);
+                
+                if (error) throw error;
+                
             } catch (error) {
-                showToast('Failed to reveal votes');
+                showToast('Failed to reveal: ' + error.message);
                 btn.disabled = false;
                 btn.textContent = 'Reveal Votes';
             }
@@ -1502,45 +1480,39 @@
             
             document.getElementById('resultQuestion').textContent = state.currentQuestion;
             
-            // Fetch results from server
-            fetchResults();
-        }
-
-        async function fetchResults() {
-            try {
-                const result = await makeRequest('getResults', { roomCode: state.roomCode });
-                if (!result.success) return;
+            // Get majority from last state or calculate
+            const majority = state.players.find(p => {
+                const count = Object.values(state.votes).filter(v => v.target === p.id).length;
+                return count === Math.max(...Object.values(state.votes).map(v => 
+                    Object.values(state.votes).filter(v2 => v2.target === v.target).length
+                ));
+            });
+            
+            document.getElementById('majorityTarget').textContent = majority?.name || 'No one';
+            
+            const list = document.getElementById('resultsList');
+            const voters = Object.keys(state.votes);
+            
+            list.innerHTML = voters.map(voterId => {
+                const voter = state.players.find(p => p.id === voterId);
+                const vote = state.votes[voterId];
+                const target = state.players.find(p => p.id === vote.target);
+                const correct = vote.target === majority?.id;
+                const points = correct ? (vote.doubleDown ? 2 : 1) : 0;
                 
-                const majorityPlayer = state.players.find(p => p.id === result.majority);
-                document.getElementById('majorityTarget').textContent = majorityPlayer ? majorityPlayer.name : 'No one';
-                
-                const list = document.getElementById('resultsList');
-                const voters = Object.keys(result.votes);
-                
-                list.innerHTML = voters.map(voterId => {
-                    const voter = state.players.find(p => p.id === voterId);
-                    const vote = result.votes[voterId];
-                    const target = state.players.find(p => p.id === vote.target);
-                    const correct = vote.target === result.majority;
-                    const points = correct ? (vote.doubleDown ? 2 : 1) : 0;
-                    
-                    return `
-                        <div class="result-item ${correct ? 'correct' : 'wrong'}">
-                            <div>
-                                <div class="voter-name">${voter?.name || 'Unknown'}</div>
-                                <div class="voted-for">voted for ${target?.name || 'Unknown'}</div>
-                                ${vote.doubleDown ? '<div style="color: #f5576c; font-size: 0.75rem; margin-top: 2px;">🚀 Double Down</div>' : ''}
-                            </div>
-                            <div class="points-earned">${correct ? '+' + points : '0'}</div>
+                return `
+                    <div class="result-item ${correct ? 'correct' : 'wrong'}">
+                        <div>
+                            <div class="voter-name">${voter?.name || 'Unknown'}</div>
+                            <div class="voted-for">voted for ${target?.name || 'Unknown'}</div>
+                            ${vote.doubleDown ? '<div style="color: #f5576c; font-size: 0.75rem; margin-top: 2px;">🚀 Double Down</div>' : ''}
                         </div>
-                    `;
-                }).join('');
-                
-                updateScoreboard();
-                
-            } catch (error) {
-                console.error('Failed to fetch results:', error);
-            }
+                        <div class="points-earned">${correct ? '+' + points : '0'}</div>
+                    </div>
+                `;
+            }).join('');
+            
+            updateScoreboard();
         }
 
         function acknowledgeResults() {
@@ -1555,10 +1527,35 @@
 
         async function nextRound() {
             try {
-                await makeRequest('nextRound', { roomCode: state.roomCode });
-                initGameView();
+                const roomId = state.currentUser.room_id;
+                const currentIdx = state.players.findIndex(p => p.id === state.currentReader);
+                const nextReader = state.players[(currentIdx + 1) % state.players.length]?.id;
+                
+                const { error } = await supabase
+                    .from('rooms')
+                    .update({
+                        game_state: 'playing',
+                        current_question: null,
+                        current_reader: nextReader,
+                        current_round: state.round + 1,
+                        last_majority: null
+                    })
+                    .eq('id', roomId);
+                
+                // Clear votes for next round
+                await supabase
+                    .from('votes')
+                    .delete()
+                    .eq('room_id', roomId)
+                    .eq('round', state.round);
+                
+                if (error) throw error;
+                
+                document.getElementById('continueBtn').textContent = 'Continue';
+                document.getElementById('continueBtn').disabled = false;
+                
             } catch (error) {
-                showToast('Failed to start next round');
+                showToast('Failed to advance: ' + error.message);
             }
         }
 
@@ -1566,7 +1563,7 @@
             showScreen('winnerScreen');
             
             const winner = state.players.find(p => p.id === winnerId);
-            document.getElementById('winnerName').textContent = winner ? winner.name : 'Unknown';
+            document.getElementById('winnerName').textContent = winner?.name || 'Unknown';
             
             const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
             
@@ -1583,18 +1580,22 @@
         }
 
         async function leaveRoom() {
-            if (syncInterval) clearInterval(syncInterval);
+            if (realtimeChannel) {
+                supabase.removeChannel(realtimeChannel);
+                realtimeChannel = null;
+            }
             
-            if (state.roomCode && state.currentUser) {
-                try {
-                    await makeRequest('leaveRoom', {
-                        roomCode: state.roomCode,
-                        userId: state.currentUser.id,
-                        wasHost: state.isHost
-                    });
-                } catch (e) {
-                    console.error('Error leaving room:', e);
+            try {
+                if (state.currentUser) {
+                    await supabase.from('players').delete().eq('id', state.currentUser.id);
+                    
+                    // If host, delete the room
+                    if (state.isHost && state.currentUser.room_id) {
+                        await supabase.from('rooms').delete().eq('id', state.currentUser.room_id);
+                    }
                 }
+            } catch (e) {
+                console.error('Error leaving:', e);
             }
             
             // Reset state
@@ -1605,11 +1606,11 @@
             state.gameState = 'waiting';
             state.doubleDownUsed = false;
             state.hasVoted = false;
+            state.scores = {};
             
             showScreen('joinScreen');
             document.getElementById('usernameInput').value = '';
             document.getElementById('roomCodeInput').value = '';
-            updateConnectionStatus('connecting');
         }
 
         function playAgain() {
@@ -1617,167 +1618,53 @@
             state.gameState = 'waiting';
             state.doubleDownUsed = false;
             state.scores = {};
-            updateLobby();
-            startSync();
-        }
-
-        // Admin Functions
-        function showAdminLogin() {
-            showScreen('adminLoginScreen');
-        }
-
-        function adminLogin() {
-            const password = document.getElementById('adminPassword').value;
-            if (password === CONFIG.ADMIN_PASSWORD) {
-                showScreen('adminScreen');
-                loadAdminData();
-                document.getElementById('adminError').classList.remove('show');
-            } else {
-                showError('adminError', 'Wrong password');
+            
+            if (state.currentUser?.room_id) {
+                loadPlayers(state.currentUser.room_id);
             }
         }
 
-        function logoutAdmin() {
-            showScreen('joinScreen');
-        }
-
-        function switchTab(tab) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            
-            event.target.classList.add('active');
-            document.getElementById(tab + 'Tab').classList.add('active');
-        }
-
-        async function loadAdminData() {
-            await updateAdminRooms();
-            updateAdminQuestions();
-        }
-
-        async function updateAdminRooms() {
-            const container = document.getElementById('adminRoomList');
-            container.innerHTML = '<div class="empty-state"><div class="loading"></div><p>Loading rooms...</p></div>';
-            
-            try {
-                const result = await makeRequest('getAllRooms');
-                
-                if (!result.success || result.rooms.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">📭</div>
-                            <p>No active rooms</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                container.innerHTML = result.rooms.map(r => `
-                    <div class="admin-user-item">
-                        <div>
-                            <div style="font-weight: bold; color: #feca57;">${r.code}</div>
-                            <div style="font-size: 0.85rem; color: #a0a0a0;">
-                                ${r.players.length} players • ${r.gameState} • Round ${r.round || 0}
-                            </div>
-                        </div>
-                        <button class="remove-btn" onclick="deleteRoom('${r.code}')">Delete</button>
-                    </div>
-                `).join('');
-                
-            } catch (error) {
-                container.innerHTML = '<div class="empty-state"><p>Failed to load rooms</p></div>';
-            }
-        }
-
-        function updateAdminQuestions() {
-            const container = document.getElementById('adminQuestionList');
-            container.innerHTML = state.questions.map((q, i) => `
-                <div class="admin-user-item" style="align-items: flex-start;">
-                    <div style="flex: 1; padding-right: 10px; font-size: 0.9rem;">${q}</div>
-                </div>
-            `).join('');
-        }
-
-        async function clearAllRooms() {
-            if (!confirm('Delete ALL rooms? This cannot be undone.')) return;
-            
-            try {
-                await makeRequest('clearAllRooms');
-                await updateAdminRooms();
-                showToast('All rooms cleared');
-            } catch (error) {
-                showToast('Failed to clear rooms');
-            }
-        }
-
-        async function deleteRoom(code) {
-            try {
-                await makeRequest('deleteRoom', { roomCode: code });
-                await updateAdminRooms();
-                showToast('Room deleted');
-            } catch (error) {
-                showToast('Failed to delete room');
-            }
-        }
-
-        async function addQuestion() {
-            const input = document.getElementById('newQuestionInput');
-            const q = input.value.trim();
-            
-            if (!q) return;
-            
-            try {
-                await makeRequest('addQuestion', { 
-                    roomCode: 'GLOBAL',
-                    question: q 
-                });
-                
-                state.questions.push(q);
-                input.value = '';
-                updateAdminQuestions();
-                showToast('Question added!');
-            } catch (error) {
-                showToast('Failed to add question');
-            }
+        function copyRoomCode() {
+            const code = document.getElementById('displayRoomCode').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                showToast('Room code copied!');
+            });
         }
 
         // Utility Functions
-        function loadQuestions() {
-            // Default questions are hardcoded, but we can load custom ones from server
-            state.questions = [
-                "Who would survive the longest in a zombie apocalypse?",
-                "Who has the worst taste in romantic partners?",
-                "Who would sell their soul for the least amount of money?",
-                "Who is most likely to fake their own death?",
-                "Who would be the worst parent?",
-                "Who has done the most 'walks of shame'?",
-                "Who would start a cult and actually succeed?",
-                "Who is most likely to get catfished online?",
-                "Who would throw their friend under the bus to save themselves?",
-                "Who has the most embarrassing search history?",
-                "Who would be the first to die in a horror movie?",
-                "Who is most likely to cry during a commercial?",
-                "Who would get into a fight at a family reunion?",
-                "Who would be friends with a dictator for the perks?",
-                "Who has the worst luck in general?",
-                "Who would snitch on their friends to the police?",
-                "Who is most likely to develop a gambling addiction?",
-                "Who would ghost their own wedding?",
-                "Who has the most skeletons in their closet?",
-                "Who would fail a lie detector test immediately?",
-                "Who is most likely to get banned from a casino?",
-                "Who would believe the most ridiculous conspiracy theory?",
-                "Who has the worst impulse control?",
-                "Who would accidentally start a fire and blame someone else?",
-                "Who is most likely to have a secret family?",
-                "Who would eat someone else's lunch from the office fridge?",
-                "Who has the worst road rage?",
-                "Who would cut in line and not feel bad about it?",
-                "Who is most likely to get lost in their own neighborhood?",
-                "Who would forget their own birthday?"
-            ];
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
         }
 
-        // Prevent zoom on double tap for mobile
+        function showToast(message, duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), duration);
+        }
+
+        function showError(elementId, message) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 5000);
+        }
+
+        function updateConnectionStatus(connected) {
+            const el = document.getElementById('connectionStatus');
+            el.classList.remove('online', 'offline', 'connecting');
+            
+            if (connected === true) {
+                el.classList.add('online');
+                el.innerHTML = '<div class="pulse-dot"></div><span>Live</span>';
+            } else {
+                el.classList.add('offline');
+                el.innerHTML = '<div class="pulse-dot"></div><span>Offline</span>';
+            }
+        }
+
+        // Prevent zoom on double tap
         let lastTouchEnd = 0;
         document.addEventListener('touchend', (e) => {
             const now = Date.now();
@@ -1786,15 +1673,6 @@
             }
             lastTouchEnd = now;
         }, false);
-
-        // Handle page visibility changes (pause sync when hidden)
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                if (syncInterval) clearInterval(syncInterval);
-            } else {
-                if (state.roomCode) startSync();
-            }
-        });
     </script>
 </body>
 </html>
