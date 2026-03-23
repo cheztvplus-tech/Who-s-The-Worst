@@ -128,6 +128,11 @@
             color: #fff;
         }
 
+        .btn-admin {
+            background: linear-gradient(45deg, #9b59b6, #8e44ad);
+            color: #fff;
+        }
+
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -639,6 +644,12 @@
             margin-bottom: 4px;
         }
 
+        .admin-login {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
         @media (max-width: 400px) {
             .players-grid {
                 grid-template-columns: repeat(2, 1fr);
@@ -662,28 +673,11 @@
     </div>
 
     <div class="container">
-        <!-- Setup Screen -->
-        <div id="setupScreen" class="screen active">
-            <h1>⚙️ Setup</h1>
-            <p class="subtitle">Connect to your Supabase project</p>
-            
-            <div class="card">
-                <input type="text" id="supabaseUrl" placeholder="Supabase URL (e.g., https://xxxx.supabase.co)" autocomplete="off">
-                <input type="text" id="supabaseKey" placeholder="Supabase Anon Key" autocomplete="off">
-                <button class="btn-primary" onclick="connectToSupabase()" id="connectBtn">
-                    Connect
-                </button>
-                <div id="setupError" class="error"></div>
-            </div>
-            
-            <div class="instructions">
-                <h3>How to get credentials:</h3>
-                <ol>
-                    <li>Go to <a href="https://supabase.com" target="_blank" style="color: #3ec1d3;">supabase.com</a> and create a project</li>
-                    <li>In your project, go to Settings → API</li>
-                    <li>Copy the <strong>URL</strong> and <strong>anon public</strong> key</li>
-                    <li>Paste them here</li>
-                </ol>
+        <!-- Loading Screen -->
+        <div id="loadingScreen" class="screen active">
+            <div style="text-align: center; padding: 100px 20px;">
+                <div class="loading" style="width: 50px; height: 50px; margin-bottom: 20px;"></div>
+                <h2 style="color: #a0a0a0;">Connecting to Supabase...</h2>
             </div>
         </div>
 
@@ -716,17 +710,34 @@
                 </ol>
             </div>
             
-            <button class="btn-secondary" onclick="showScreen('adminScreen')" style="margin-top: 10px;">
-                Manage Questions
-            </button>
-            <button class="btn-secondary" onclick="backToSetup()" style="margin-top: 10px;">
-                Change Connection
-            </button>
+            <div class="admin-login">
+                <button class="btn-admin" onclick="showAdminLogin()">
+                    🔐 Admin Access
+                </button>
+            </div>
         </div>
 
-        <!-- Admin Screen -->
+        <!-- Admin Login Screen -->
+        <div id="adminLoginScreen" class="screen">
+            <h1>🔐 Admin Login</h1>
+            <p class="subtitle">Enter admin password to manage questions</p>
+            
+            <div class="card">
+                <input type="password" id="adminPassword" placeholder="Admin password">
+                <button class="btn-admin" onclick="adminLogin()" id="adminLoginBtn">
+                    Login
+                </button>
+                <button class="btn-secondary" onclick="showScreen('joinScreen')">
+                    Back to Game
+                </button>
+                <div id="adminLoginError" class="error"></div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard -->
         <div id="adminScreen" class="screen">
-            <h1>⚙️ Admin</h1>
+            <h1>⚙️ Admin Dashboard</h1>
+            <p class="subtitle">Manage game questions</p>
             
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('add')">Add Question</button>
@@ -785,7 +796,7 @@
                 </div>
             </div>
 
-            <button class="btn-secondary" onclick="showScreen('joinScreen')" style="margin-top: 10px;">Back to Game</button>
+            <button class="btn-secondary" onclick="logoutAdmin()" style="margin-top: 10px;">Logout</button>
         </div>
 
         <!-- Lobby Screen -->
@@ -923,6 +934,11 @@
     <div id="toast" class="toast"></div>
 
     <script>
+        // HARDCODED SUPABASE CONFIG
+        const SUPABASE_URL = 'https://porpqvphytecuidomcgy.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvcnBxdnBoeXRlY3VpZG9tY2d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQwODUsImV4cCI6MjA4OTgxMDA4NX0.IFECuGpxl4HcMfFx7oqmbsVdeOLMK_4wvEi2L-NGNzI';
+        const ADMIN_PASSWORD = 'worst123'; // Change this to your desired admin password
+
         // Game Configuration
         const CONFIG = {
             MIN_PLAYERS: 3,
@@ -933,6 +949,7 @@
         // Global State
         let supabase = null;
         let realtimeChannel = null;
+        let isAdminLoggedIn = false;
         
         const state = {
             currentUser: null,
@@ -949,64 +966,71 @@
             round: 1
         };
 
-        // Initialize
+        // Initialize - Auto connect on load
         window.onload = function() {
-            const savedUrl = localStorage.getItem('supabaseUrl');
-            const savedKey = localStorage.getItem('supabaseKey');
-            
-            if (savedUrl && savedKey) {
-                document.getElementById('supabaseUrl').value = savedUrl;
-                document.getElementById('supabaseKey').value = savedKey;
-                connectToSupabase();
-            }
+            initSupabase();
         };
 
-        // Supabase Connection
-        async function connectToSupabase() {
-            const url = document.getElementById('supabaseUrl').value.trim();
-            const key = document.getElementById('supabaseKey').value.trim();
-            const btn = document.getElementById('connectBtn');
-            
-            if (!url || !key) {
-                showError('setupError', 'Please enter both URL and Key');
-                return;
-            }
-            
-            btn.disabled = true;
-            btn.innerHTML = 'Connecting... <div class="loading"></div>';
-            
+        // Initialize Supabase with hardcoded credentials
+        async function initSupabase() {
             try {
-                supabase = window.supabase.createClient(url, key);
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                 
+                // Test connection
                 const { error } = await supabase.from('rooms').select('count', { count: 'exact', head: true });
                 
                 if (error && error.code !== 'PGRST116') {
                     throw error;
                 }
                 
-                localStorage.setItem('supabaseUrl', url);
-                localStorage.setItem('supabaseKey', key);
-                
                 updateConnectionStatus(true);
-                showToast('Connected! Loading questions...');
                 
+                // Load questions
                 await loadQuestionsFromSupabase();
                 
                 showScreen('joinScreen');
-                showToast(`Loaded ${CONFIG.QUESTIONS.length} questions!`);
+                showToast(`Connected! Loaded ${CONFIG.QUESTIONS.length} questions`);
                 
             } catch (error) {
-                showError('setupError', 'Failed to connect: ' + error.message);
-                btn.disabled = false;
-                btn.textContent = 'Connect';
+                console.error('Connection error:', error);
+                showScreen('joinScreen');
+                showToast('Connection failed. Some features may not work.');
             }
         }
 
-        function backToSetup() {
-            showScreen('setupScreen');
-            if (realtimeChannel) {
-                supabase.removeChannel(realtimeChannel);
-                realtimeChannel = null;
+        // Admin Functions
+        function showAdminLogin() {
+            showScreen('adminLoginScreen');
+        }
+
+        function adminLogin() {
+            const password = document.getElementById('adminPassword').value;
+            const btn = document.getElementById('adminLoginBtn');
+            
+            if (password === ADMIN_PASSWORD) {
+                isAdminLoggedIn = true;
+                showScreen('adminScreen');
+                document.getElementById('adminLoginError').classList.remove('show');
+                document.getElementById('adminPassword').value = '';
+            } else {
+                showError('adminLoginError', 'Wrong password');
+            }
+        }
+
+        function logoutAdmin() {
+            isAdminLoggedIn = false;
+            showScreen('joinScreen');
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tab + 'Tab').classList.add('active');
+            
+            if (tab === 'view') {
+                loadQuestionsList();
             }
         }
 
@@ -1060,19 +1084,6 @@
             return q.text || q;
         }
 
-        // Admin Functions
-        function switchTab(tab) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            
-            event.target.classList.add('active');
-            document.getElementById(tab + 'Tab').classList.add('active');
-            
-            if (tab === 'view') {
-                loadQuestionsList();
-            }
-        }
-
         async function addNewQuestion() {
             const input = document.getElementById('newQuestionInput');
             const category = document.getElementById('questionCategory');
@@ -1104,7 +1115,6 @@
                 input.value = '';
                 showToast('Question added!');
                 
-                // Reload questions
                 await loadQuestionsFromSupabase();
                 
             } catch (error) {
