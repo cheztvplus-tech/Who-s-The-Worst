@@ -1794,10 +1794,13 @@
     // ==========================================
     // DRAW CARD - SIMPLIFIED VERSION
     // ==========================================
-    async function drawCard() {
+        async function drawCard() {
+        // If instigator hasn't confirmed vote, confirm it now
         if (state.currentReader === state.currentUser?.id && state.instigatorVote && !state.instigatorVoteConfirmed) {
             state.instigatorVoteConfirmed = true;
             document.getElementById('instigatorPicker')?.remove();
+        }
+        
         const btn = document.getElementById('drawCardBtn');
         btn.disabled = true;
         btn.textContent = 'Drawing...';
