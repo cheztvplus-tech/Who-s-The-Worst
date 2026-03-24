@@ -956,8 +956,7 @@
     </div>
 
     <div id="toast" class="toast"></div>
-
-    <script>
+<script>
     // ==========================================
     // CONFIGURATION
     // ==========================================
@@ -997,23 +996,31 @@
     // INITIALIZATION
     // ==========================================
     window.onload = function() {
+        console.log('Window loaded, initializing...');
         initSupabase();
     };
 
     async function initSupabase() {
         try {
+            console.log('Creating Supabase client...');
             supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
             
+            console.log('Testing connection...');
             const { error } = await supabaseClient.from('rooms').select('count', { count: 'exact', head: true });
             
             if (error && error.code !== 'PGRST116') {
                 throw error;
             }
             
+            console.log('Connection successful!');
             updateConnectionStatus(true);
+            
+            console.log('Loading questions...');
             await loadQuestionsFromSupabase();
+            
+            console.log(`Loaded ${CONFIG.QUESTIONS.length} questions`);
             showScreen('joinScreen');
-            showToast(`Connected! Loaded ${CONFIG.QUESTIONS.length} questions`);
+            showToast(`Connected! ${CONFIG.QUESTIONS.length} questions ready`);
             
         } catch (error) {
             console.error('Connection error:', error);
@@ -1024,15 +1031,62 @@
     }
 
     // ==========================================
-    // ADMIN FUNCTIONS
+    // QUESTIONS MANAGEMENT
     // ==========================================
-    function showAdminLogin() {
-        showScreen('adminLoginScreen');
+    async function loadQuestionsFromSupabase() {
+        try {
+            console.log('Fetching questions from Supabase...');
+            const { data: questions, error } = await supabaseClient
+                .from('questions')
+                .select('*')
+                .order('created_at', { ascending: true });
+            
+            if (error) {
+                console.error('Error fetching questions:', error);
+                throw error;
+            }
+            
+            console.log(`Fetched ${questions?.length || 0} questions from database`);
+            
+            if (questions && questions.length > 0) {
+                CONFIG.QUESTIONS = questions.map(q => ({
+                    id: q.id,
+                    text: q.question_text,
+                    category: q.category || 'General'
+                }));
+            } else {
+                console.warn('No questions in database, using defaults');
+                CONFIG.QUESTIONS = getDefaultQuestions();
+            }
+            
+        } catch (error) {
+            console.error('Error loading questions:', error);
+            CONFIG.QUESTIONS = getDefaultQuestions();
+        }
     }
 
+    function getDefaultQuestions() {
+        return [
+            { id: 'default-1', text: "Who would survive the longest in a zombie apocalypse?", category: "Random" },
+            { id: 'default-2', text: "Who has the worst taste in romantic partners?", category: "Savage" },
+            { id: 'default-3', text: "Who would sell their soul for the least amount of money?", category: "Savage" },
+            { id: 'default-4', text: "Who would be the most likely to fake their own death?", category: "Random" },
+            { id: 'default-5', text: "Who would be the worst parent?", category: "Brutal" },
+            { id: 'default-6', text: "Who has done the most 'walks of shame'?", category: "Embarrassing" },
+            { id: 'default-7', text: "Who would start a cult and actually succeed?", category: "Random" },
+            { id: 'default-8', text: "Who is most likely to get catfished online?", category: "Embarrassing" },
+            { id: 'default-9', text: "Who would throw their friend under the bus to save themselves?", category: "Brutal" },
+            { id: 'default-10', text: "Who has the most embarrassing search history?", category: "Embarrassing" }
+        ];
+    }
+
+    // ==========================================
+    // ADMIN FUNCTIONS (simplified)
+    // ==========================================
+    function showAdminLogin() { showScreen('adminLoginScreen'); }
+    
     function adminLogin() {
         const password = document.getElementById('adminPassword').value;
-        
         if (password === ADMIN_PASSWORD) {
             isAdminLoggedIn = true;
             showScreen('adminScreen');
@@ -1051,66 +1105,9 @@
     function switchTab(tab) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-        
         event.target.classList.add('active');
         document.getElementById(tab + 'Tab').classList.add('active');
-        
-        if (tab === 'view') {
-            loadQuestionsList();
-        }
-    }
-
-    // ==========================================
-    // QUESTIONS MANAGEMENT
-    // ==========================================
-    async function loadQuestionsFromSupabase() {
-        try {
-            const { data: questions, error } = await supabaseClient
-                .from('questions')
-                .select('*')
-                .order('created_at', { ascending: true });
-            
-            if (error) throw error;
-            
-            if (questions && questions.length > 0) {
-                CONFIG.QUESTIONS = questions.map(q => ({
-                    id: q.id,
-                    text: q.question_text,
-                    category: q.category
-                }));
-           console.log(`Loaded ${CONFIG.QUESTIONS.length} questions from database`);
-        } else {
-            console.warn('No questions in database, using defaults');
-            CONFIG.QUESTIONS = getDefaultQuestions();
-        }
-        
-    } catch (error) {
-        console.error('Error loading questions:', error);
-        CONFIG.QUESTIONS = getDefaultQuestions();
-    }
-}
-
-    function getDefaultQuestions() {
-        return [
-            { id: '1', text: "Who would survive the longest in a zombie apocalypse?", category: "Random" },
-            { id: '2', text: "Who has the worst taste in romantic partners?", category: "Savage" },
-            { id: '3', text: "Who would sell their soul for the least amount of money?", category: "Savage" },
-            { id: '4', text: "Who would be the most likely to fake their own death?", category: "Random" },
-            { id: '5', text: "Who would be the worst parent?", category: "Brutal" },
-            { id: '6', text: "Who has done the most 'walks of shame'?", category: "Embarrassing" },
-            { id: '7', text: "Who would start a cult and actually succeed?", category: "Random" },
-            { id: '8', text: "Who is most likely to get catfished online?", category: "Embarrassing" },
-            { id: '9', text: "Who would throw their friend under the bus to save themselves?", category: "Brutal" },
-            { id: '10', text: "Who has the most embarrassing search history?", category: "Embarrassing" }
-        ];
-    }
-
-    function getRandomQuestion() {
-        if (CONFIG.QUESTIONS.length === 0) {
-            return { text: "Who is the worst? (No questions loaded)", id: null };
-        }
-        const q = CONFIG.QUESTIONS[Math.floor(Math.random() * CONFIG.QUESTIONS.length)];
-        return q;
+        if (tab === 'view') loadQuestionsList();
     }
 
     async function addNewQuestion() {
@@ -1118,33 +1115,18 @@
         const category = document.getElementById('questionCategory');
         const text = input.value.trim();
         
-        if (!text) {
-            showError('adminError', 'Enter a question');
-            return;
-        }
-        
-        if (!text.toLowerCase().startsWith('who')) {
-            showError('adminError', 'Question should start with "Who"');
-            return;
-        }
+        if (!text) return showError('adminError', 'Enter a question');
+        if (!text.toLowerCase().startsWith('who')) return showError('adminError', 'Question should start with "Who"');
         
         try {
-            const { data, error } = await supabaseClient
+            const { error } = await supabaseClient
                 .from('questions')
-                .insert({
-                    question_text: text,
-                    category: category.value,
-                    is_default: false
-                })
-                .select()
-                .single();
+                .insert({ question_text: text, category: category.value, is_default: false });
             
             if (error) throw error;
-            
             input.value = '';
             showToast('Question added!');
             await loadQuestionsFromSupabase();
-            
         } catch (error) {
             showError('adminError', error.message);
         }
@@ -1162,9 +1144,7 @@
         }
         
         document.getElementById('questionCount').textContent = questions.length;
-        
-        const list = document.getElementById('questionsList');
-        list.innerHTML = questions.map(q => `
+        document.getElementById('questionsList').innerHTML = questions.map(q => `
             <div class="question-item" style="border-left-color: ${q.is_default ? '#feca57' : '#3ec1d3'};">
                 <div class="question-category">${q.category}</div>
                 <div>${q.question_text}</div>
@@ -1177,28 +1157,15 @@
     // ==========================================
     async function createRoom() {
         const username = document.getElementById('usernameInput').value.trim();
-        
-        if (!username) {
-            showError('joinError', 'Enter your name first');
-            return;
-        }
-        
-        if (username.length < 2) {
-            showError('joinError', 'Name too short');
-            return;
-        }
+        if (!username) return showError('joinError', 'Enter your name first');
+        if (username.length < 2) return showError('joinError', 'Name too short');
         
         const code = Math.random().toString(36).substring(2, 8).toUpperCase();
         
         try {
             const { data: room, error } = await supabaseClient
                 .from('rooms')
-                .insert({
-                    code: code,
-                    game_state: 'waiting',
-                    current_round: 1,
-                    created_at: new Date().toISOString()
-                })
+                .insert({ code: code, game_state: 'waiting', current_round: 1, created_at: new Date().toISOString() })
                 .select()
                 .single();
             
@@ -1206,13 +1173,7 @@
             
             const { data: player, error: playerError } = await supabaseClient
                 .from('players')
-                .insert({
-                    room_id: room.id,
-                    name: username,
-                    is_host: true,
-                    double_down_used: false,
-                    joined_at: new Date().toISOString()
-                })
+                .insert({ room_id: room.id, name: username, is_host: true, double_down_used: false, joined_at: new Date().toISOString() })
                 .select()
                 .single();
             
@@ -1221,7 +1182,6 @@
             state.currentUser = player;
             state.roomCode = code;
             state.isHost = true;
-            
             enterLobby(room.id);
             
         } catch (error) {
@@ -1249,36 +1209,20 @@
                 .eq('code', roomCode)
                 .single();
             
-            if (roomError || !room) {
-                throw new Error('Room not found');
-            }
+            if (roomError || !room) throw new Error('Room not found');
+            if (room.game_state !== 'waiting') throw new Error('Game already started');
             
-            if (room.game_state !== 'waiting') {
-                throw new Error('Game already started');
-            }
-            
-            const { data: existingPlayers, error: countError } = await supabaseClient
+            const { data: existingPlayers } = await supabaseClient
                 .from('players')
                 .select('*')
                 .eq('room_id', room.id);
             
-            if (existingPlayers && existingPlayers.length >= 15) {
-                throw new Error('Room full');
-            }
-            
-            if (existingPlayers && existingPlayers.find(p => p.name === username)) {
-                throw new Error('Name taken');
-            }
+            if (existingPlayers && existingPlayers.length >= 15) throw new Error('Room full');
+            if (existingPlayers && existingPlayers.find(p => p.name === username)) throw new Error('Name taken');
             
             const { data: player, error: playerError } = await supabaseClient
                 .from('players')
-                .insert({
-                    room_id: room.id,
-                    name: username,
-                    is_host: existingPlayers.length === 0,
-                    double_down_used: false,
-                    joined_at: new Date().toISOString()
-                })
+                .insert({ room_id: room.id, name: username, is_host: existingPlayers.length === 0, double_down_used: false, joined_at: new Date().toISOString() })
                 .select()
                 .single();
             
@@ -1287,7 +1231,6 @@
             state.currentUser = player;
             state.roomCode = roomCode;
             state.isHost = existingPlayers.length === 0;
-            
             enterLobby(room.id);
             
         } catch (error) {
@@ -1313,24 +1256,12 @@
         subscribeToRoom(roomId);
     }
 
-    // ==========================================
-    // REALTIME SUBSCRIPTION
-    // ==========================================
     function subscribeToRoom(roomId) {
         realtimeChannel = supabaseClient
             .channel('room:' + roomId)
-            .on('postgres_changes', 
-                { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId },
-                (payload) => handleRoomChange(payload.new)
-            )
-            .on('postgres_changes',
-                { event: '*', schema: 'public', table: 'players', filter: 'room_id=eq.' + roomId },
-                () => loadPlayers(roomId)
-            )
-            .on('postgres_changes',
-                { event: '*', schema: 'public', table: 'votes', filter: 'room_id=eq.' + roomId },
-                () => loadVotes(roomId)
-            )
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId }, (payload) => handleRoomChange(payload.new))
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: 'room_id=eq.' + roomId }, () => loadPlayers(roomId))
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'votes', filter: 'room_id=eq.' + roomId }, () => loadVotes(roomId))
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     updateConnectionStatus(true);
@@ -1346,10 +1277,7 @@
             .eq('room_id', roomId)
             .order('joined_at', { ascending: true });
         
-        if (error) {
-            console.error('Load players error:', error);
-            return;
-        }
+        if (error) return;
         
         state.players = players;
         updateLobby();
@@ -1368,17 +1296,11 @@
             .eq('room_id', roomId)
             .eq('round', state.round);
         
-        if (error) {
-            console.error('Load votes error:', error);
-            return;
-        }
+        if (error) return;
         
         state.votes = {};
         votes.forEach(v => {
-            state.votes[v.player_id] = {
-                target: v.target_id,
-                doubleDown: v.double_down
-            };
+            state.votes[v.player_id] = { target: v.target_id, doubleDown: v.double_down };
         });
         
         updateVotingStatus();
@@ -1392,9 +1314,7 @@
         state.currentReader = room.current_reader;
         state.round = room.current_round;
         
-        if (room.scores) {
-            state.scores = room.scores;
-        }
+        if (room.scores) state.scores = room.scores;
         
         if (state.gameState === 'playing' || state.gameState === 'results') {
             if (document.getElementById('lobbyScreen').classList.contains('active')) {
@@ -1411,15 +1331,12 @@
         }
     }
 
-    // ==========================================
-    // GAME LOGIC
-    // ==========================================
     function updateLobby() {
         document.getElementById('playerCount').textContent = state.players.length;
         
         const grid = document.getElementById('lobbyPlayers');
         if (state.players.length === 0) {
-            grid.innerHTML = '<div class="empty-state" style="grid-column: 1/-1;"><div class="empty-state-icon">👥</div><p>No players yet</p></div>';
+            grid.innerHTML = '<div style="grid-column: 1/-1; padding: 20px; text-align: center; color: #a0a0a0;">No players yet</div>';
         } else {
             grid.innerHTML = state.players.map(p => `
                 <div class="player-card ${p.id === state.currentUser?.id ? 'current-user' : ''}">
@@ -1455,8 +1372,6 @@
         
         try {
             const roomId = state.currentUser.room_id;
-            
-            // Pick random starting reader
             const randomIndex = Math.floor(Math.random() * state.players.length);
             const startingReader = state.players[randomIndex]?.id;
             
@@ -1465,12 +1380,7 @@
             
             const { error } = await supabaseClient
                 .from('rooms')
-                .update({
-                    game_state: 'playing',
-                    current_reader: startingReader, // Random first reader
-                    scores: scores,
-                    started_at: new Date().toISOString()
-                })
+                .update({ game_state: 'playing', current_reader: startingReader, scores: scores, started_at: new Date().toISOString() })
                 .eq('id', roomId);
             
             if (error) throw error;
@@ -1609,312 +1519,148 @@
         btn.classList.toggle('active');
     }
 
-// ==========================================
-// 3-CARD DRAW MECHANIC
-// ==========================================
-async function drawCard() {
-    const btn = document.getElementById('drawCardBtn');
-    btn.disabled = true;
-    btn.textContent = 'Drawing...';
-    
-    console.log('=== DRAW CARD STARTED ===');
-    console.log('Current questions in memory:', CONFIG.QUESTIONS.length);
-    
-    try {
-        const roomId = state.currentUser.room_id;
-        console.log('Room ID:', roomId);
+    // ==========================================
+    // SIMPLIFIED DRAW CARD (NO 3D FLIP FOR NOW)
+    // ==========================================
+    async function drawCard() {
+        const btn = document.getElementById('drawCardBtn');
+        btn.disabled = true;
+        btn.textContent = 'Drawing...';
         
-        // Get already used question IDs for this room
-        const { data: usedQs, error: usedError } = await supabaseClient
-            .from('used_questions')
-            .select('question_id')
-            .eq('room_id', roomId);
+        console.log('=== DRAW CARD ===');
+        console.log('Questions available:', CONFIG.QUESTIONS.length);
         
-        if (usedError) {
-            console.error('Error fetching used questions:', usedError);
-            throw usedError;
-        }
-        
-        console.log('Used questions:', usedQs);
-        
-        const usedIds = usedQs?.map(uq => uq.question_id) || [];
-        console.log('Used IDs:', usedIds);
-        
-        // Get available questions
-        let availableQuestions = CONFIG.QUESTIONS.filter(q => {
-            const isUsed = usedIds.includes(q.id);
-            console.log(`Question ${q.id} (${q.text.substring(0, 30)}...): used=${isUsed}`);
-            return !isUsed;
-        });
-        
-        console.log('Available questions:', availableQuestions.length);
-        
-        // If not enough questions available, reset used questions
-        if (availableQuestions.length < 3) {
-            console.log('Less than 3 questions available, resetting...');
-            await supabaseClient
-                .from('used_questions')
-                .delete()
-                .eq('room_id', roomId);
-            availableQuestions = CONFIG.QUESTIONS;
-            console.log('After reset, available:', availableQuestions.length);
-        }
-        
-        if (availableQuestions.length === 0) {
-            throw new Error('No questions available - check if questions loaded from database');
-        }
-        
-        // Draw 3 random questions (or fewer if not enough available)
-        const numCards = Math.min(3, availableQuestions.length);
-        const drawnCards = [];
-        const tempQuestions = [...availableQuestions];
-        
-        for (let i = 0; i < numCards; i++) {
-            const randomIdx = Math.floor(Math.random() * tempQuestions.length);
-            drawnCards.push(tempQuestions[randomIdx]);
-            tempQuestions.splice(randomIdx, 1);
-        }
-        
-        console.log('Drawn cards:', drawnCards.map(c => ({id: c.id, category: c.category, text: c.text.substring(0, 50)})));
-        
-        // Show card picker UI
-        showCardPicker(drawnCards, roomId);
-        
-    } catch (error) {
-        console.error('=== DRAW CARD ERROR ===', error);
-        showToast('Failed to draw cards: ' + error.message);
-        btn.disabled = false;
-        btn.textContent = 'Draw Card';
-    }
-}
-
-    function showCardPicker(cards, roomId) {
-    console.log('=== SHOW CARD PICKER ===');
-    console.log('Cards to display:', cards.length);
-    
-    const btn = document.getElementById('drawCardBtn');
-    const readerView = document.getElementById('readerView');
-    
-    if (!readerView) {
-        console.error('readerView not found!');
-        return;
-    }
-    
-    // Remove existing picker
-    const existingPicker = document.getElementById('cardPicker');
-    if (existingPicker) {
-        existingPicker.remove();
-    }
-    
-    // Add flip animation styles if not already added
-    if (!document.getElementById('flipStyles')) {
-        const style = document.createElement('style');
-        style.id = 'flipStyles';
-        style.textContent = `
-            .card-container {
-                perspective: 1000px;
-                width: 140px;
-                height: 200px;
-            }
-            .card-inner {
-                position: relative;
-                width: 100%;
-                height: 100%;
-                text-align: center;
-                transition: transform 0.6s;
-                transform-style: preserve-3d;
-                cursor: pointer;
-            }
-            .card-container.flipped .card-inner {
-                transform: rotateY(180deg);
-            }
-            .card-front, .card-back {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                -webkit-backface-visibility: hidden;
-                backface-visibility: hidden;
-                border-radius: 15px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                border: 3px solid rgba(255, 255, 255, 0.2);
-                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-                overflow: hidden;
-            }
-            .card-front {
-                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-                color: white;
-            }
-            .card-back {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                transform: rotateY(180deg);
-                padding: 15px;
-            }
-            .card-container:hover .card-inner {
-                transform: rotateY(10deg);
-            }
-            .card-container.flipped:hover .card-inner {
-                transform: rotateY(180deg);
-            }
-        `;
-        document.head.appendChild(style);
-    }
-    
-    // Create card picker HTML with flip animation
-    let cardsHTML = '';
-    cards.forEach((card, index) => {
-        const safeText = (card.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        const safeCategory = (card.category || 'Question').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        const safeId = (card.id || '').replace(/'/g, "\\'");
-        
-        cardsHTML += `
-            <div class="card-container" id="card-${index}" onclick="flipAndSelectCard(${index}, '${safeId}', '${safeText}', '${safeCategory}', '${roomId}')">
-                <div class="card-inner">
-                    <!-- Front of card (shows category) -->
-                    <div class="card-front">
-                        <div style="position: absolute; top: 8px; left: 8px; font-size: 1.2rem;">🃏</div>
-                        <div style="position: absolute; top: 8px; right: 8px; font-size: 1.2rem;">🃏</div>
-                        
-                        <div style="text-align: center; z-index: 1; width: 100%;">
-                            <div style="font-size: 2.5rem; margin-bottom: 10px;">❓</div>
-                            <div style="color: #feca57; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-weight: 600;">Category</div>
-                            <div style="color: #fff; font-size: 0.85rem; font-weight: bold; line-height: 1.2; padding: 0 10px; text-align: center;">
-                                ${card.category || 'Random'}
-                            </div>
-                        </div>
-                        
-                        <div style="position: absolute; bottom: 8px; right: 8px; font-size: 1.2rem; transform: rotate(180deg);">🃏</div>
-                        <div style="position: absolute; bottom: 8px; left: 8px; font-size: 1.2rem; transform: rotate(180deg);">🃏</div>
-                        <div style="position: absolute; bottom: 35px; color: rgba(255,255,255,0.4); font-size: 0.7rem; letter-spacing: 1px;">CARD ${index + 1}</div>
-                    </div>
-                    
-                    <!-- Back of card (shows question preview) -->
-                    <div class="card-back">
-                        <div style="font-size: 1.5rem; margin-bottom: 10px;">👁️</div>
-                        <div style="font-size: 0.8rem; font-weight: bold; line-height: 1.3;">
-                            ${card.text.substring(0, 60)}${card.text.length > 60 ? '...' : ''}
-                        </div>
-                        <div style="margin-top: 15px; font-size: 0.7rem; color: #feca57; text-transform: uppercase;">
-                            Tap to use this card
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    const pickerHTML = `
-        <div id="cardPicker" style="text-align: center; margin-bottom: 20px; animation: fadeIn 0.3s ease;">
-            <h3 style="color: #feca57; margin-bottom: 15px;">🎴 Pick a Question</h3>
-            <p style="color: #a0a0a0; font-size: 0.85rem; margin-bottom: 15px;">Hover to peek • Click to flip & select</p>
-            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px; perspective: 1000px;">
-                ${cardsHTML}
-            </div>
-        </div>
-    `;
-    
-    // Insert picker before the action buttons
-    const actionButtons = document.getElementById('drawCardBtn').parentNode;
-    const pickerDiv = document.createElement('div');
-    pickerDiv.innerHTML = pickerHTML;
-    readerView.insertBefore(pickerDiv.firstElementChild, actionButtons);
-    
-    // Hide draw button and question card
-    document.getElementById('readerQuestionCard').style.display = 'none';
-    btn.classList.add('hidden');
-    
-    console.log('Card picker inserted with 3D flip animation');
-}
-
-// New function to handle flip + select
-async function flipAndSelectCard(index, questionId, questionText, category, roomId) {
-    const cardContainer = document.getElementById(`card-${index}`);
-    
-    // If already flipped, select it
-    if (cardContainer.classList.contains('flipped')) {
-        await selectCard(questionId, questionText, category, roomId);
-        return;
-    }
-    
-    // Flip all other cards back first
-    document.querySelectorAll('.card-container').forEach((card, i) => {
-        if (i !== index) {
-            card.classList.remove('flipped');
-        }
-    });
-    
-    // Flip this card
-    cardContainer.classList.add('flipped');
-    
-    // Add "Select" hint
-    setTimeout(() => {
-        if (cardContainer.classList.contains('flipped')) {
-            // Keep it flipped, user can click again to select
-        }
-    }, 600);
-}
-
-async function selectCard(questionId, questionText, category, roomId) {
-    console.log('=== SELECT CARD ===', {questionId, category, roomId});
-    
-    try {
-        // Animate picker away
-        const picker = document.getElementById('cardPicker');
-        if (picker) {
-            picker.style.transition = 'all 0.5s ease';
-            picker.style.transform = 'scale(0.8) translateY(-50px)';
-            picker.style.opacity = '0';
-            setTimeout(() => picker.remove(), 500);
-        }
-        
-        // Show the selected question with fancy reveal
-        const questionCard = document.getElementById('readerQuestionCard');
-        questionCard.style.display = 'flex';
-        questionCard.style.flexDirection = 'column';
-        questionCard.style.animation = 'none';
-        questionCard.offsetHeight; // Trigger reflow
-        questionCard.style.animation = 'fadeIn 0.5s ease';
-        
-        questionCard.innerHTML = `
-            <div style="font-size: 0.75rem; color: #feca57; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 5px;">
-                <span>🎴</span>
-                <span>${category || 'Question'}</span>
-            </div>
-            <div style="font-size: 1.3rem; font-weight: 600; line-height: 1.4;">${questionText}</div>
-        `;
-        
-        // Mark this question as used
-        if (questionId) {
-            console.log('Marking question as used:', questionId);
-            const { error: insertError } = await supabaseClient.from('used_questions').insert({
-                room_id: roomId,
-                question_id: questionId,
-                round_number: state.round
-            });
+        try {
+            const roomId = state.currentUser.room_id;
             
-            if (insertError) {
-                console.error('Error marking question as used:', insertError);
+            // Get used questions
+            const { data: usedQs, error: usedError } = await supabaseClient
+                .from('used_questions')
+                .select('question_id')
+                .eq('room_id', roomId);
+            
+            if (usedError) throw usedError;
+            
+            const usedIds = usedQs?.map(uq => uq.question_id) || [];
+            console.log('Used questions:', usedIds.length);
+            
+            // Filter available questions
+            let available = CONFIG.QUESTIONS.filter(q => !usedIds.includes(q.id));
+            console.log('Available:', available.length);
+            
+            // Reset if needed
+            if (available.length < 3) {
+                await supabaseClient.from('used_questions').delete().eq('room_id', roomId);
+                available = CONFIG.QUESTIONS;
+                console.log('Reset, now available:', available.length);
             }
+            
+            // Draw 3 cards
+            const drawn = [];
+            const temp = [...available];
+            for (let i = 0; i < Math.min(3, temp.length); i++) {
+                const idx = Math.floor(Math.random() * temp.length);
+                drawn.push(temp[idx]);
+                temp.splice(idx, 1);
+            }
+            
+            console.log('Drawn:', drawn.map(d => d.category));
+            
+            // Show simple card picker
+            showSimpleCardPicker(drawn, roomId);
+            
+        } catch (error) {
+            console.error('Draw error:', error);
+            showToast('Error: ' + error.message);
+            btn.disabled = false;
+            btn.textContent = 'Draw Card';
         }
-        
-        // Update room with selected question
-        const { error: updateError } = await supabaseClient
-            .from('rooms')
-            .update({ current_question: questionText })
-            .eq('id', roomId);
-        
-        if (updateError) throw updateError;
-        
-        showToast('📢 Read the question aloud! Waiting for votes...');
-        
-    } catch (error) {
-        console.error('=== SELECT CARD ERROR ===', error);
-        showToast('Failed to select card: ' + error.message);
     }
-}
+
+    function showSimpleCardPicker(cards, roomId) {
+        const readerView = document.getElementById('readerView');
+        const btn = document.getElementById('drawCardBtn');
+        
+        // Remove existing
+        const existing = document.getElementById('cardPicker');
+        if (existing) existing.remove();
+        
+        // Create picker HTML
+        const picker = document.createElement('div');
+        picker.id = 'cardPicker';
+        picker.innerHTML = `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h3 style="color: #feca57; margin-bottom: 15px;">🎴 Pick a Question</h3>
+                <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
+                    ${cards.map((card, i) => `
+                        <div onclick="selectCard('${card.id}', '${card.text.replace(/'/g, "\\'")}', '${(card.category || 'Question').replace(/'/g, "\\'")}', '${roomId}')"
+                             style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    border-radius: 15px;
+                                    padding: 20px;
+                                    width: 150px;
+                                    min-height: 180px;
+                                    cursor: pointer;
+                                    transition: all 0.2s;
+                                    border: 3px solid transparent;
+                                    display: flex;
+                                    flex-direction: column;
+                                    align-items: center;
+                                    justify-content: center;"
+                             onmouseover="this.style.transform='scale(1.05)'; this.style.borderColor='#feca57';"
+                             onmouseout="this.style.transform='scale(1)'; this.style.borderColor='transparent';">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">🎴</div>
+                            <div style="color: #feca57; font-size: 0.7rem; text-transform: uppercase; margin-bottom: 5px;">${card.category || 'Question'}</div>
+                            <div style="color: #fff; font-size: 0.8rem; font-weight: bold;">Card ${i + 1}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                <p style="color: #a0a0a0; font-size: 0.85rem;">Tap a card to reveal the question</p>
+            </div>
+        `;
+        
+        readerView.insertBefore(picker, btn.parentNode);
+        document.getElementById('readerQuestionCard').style.display = 'none';
+        btn.classList.add('hidden');
+    }
+
+    async function selectCard(questionId, questionText, category, roomId) {
+        console.log('Selected:', category);
+        
+        try {
+            // Remove picker
+            document.getElementById('cardPicker')?.remove();
+            
+            // Show question
+            const card = document.getElementById('readerQuestionCard');
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.innerHTML = `
+                <div style="color: #feca57; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 10px;">📁 ${category}</div>
+                <div>${questionText}</div>
+            `;
+            
+            // Mark used
+            if (questionId) {
+                await supabaseClient.from('used_questions').insert({
+                    room_id: roomId,
+                    question_id: questionId,
+                    round_number: state.round
+                });
+            }
+            
+            // Update room
+            await supabaseClient
+                .from('rooms')
+                .update({ current_question: questionText })
+                .eq('id', roomId);
+            
+            showToast('Question revealed! Waiting for votes...');
+            
+        } catch (error) {
+            console.error('Select error:', error);
+            showToast('Error: ' + error.message);
+        }
+    }
 
     async function submitVote(targetId) {
         if (state.hasVoted) return;
@@ -1950,7 +1696,7 @@ async function selectCard(questionId, questionText, category, roomId) {
             document.getElementById('voterStatus').textContent = 'Vote submitted!';
             
         } catch (error) {
-            console.error('Submit vote error:', error);
+            console.error('Vote error:', error);
             showToast('Failed to vote: ' + error.message);
             state.hasVoted = false;
         }
@@ -1988,17 +1734,13 @@ async function selectCard(questionId, questionText, category, roomId) {
             
             const { error } = await supabaseClient
                 .from('rooms')
-                .update({
-                    game_state: 'results',
-                    scores: newScores,
-                    last_majority: majority
-                })
+                .update({ game_state: 'results', scores: newScores, last_majority: majority })
                 .eq('id', roomId);
             
             if (error) throw error;
             
         } catch (error) {
-            console.error('Reveal votes error:', error);
+            console.error('Reveal error:', error);
             showToast('Failed to reveal: ' + error.message);
             btn.disabled = false;
             btn.textContent = 'Reveal Votes';
@@ -2056,19 +1798,12 @@ async function selectCard(questionId, questionText, category, roomId) {
         }
     }
 
-    // ==========================================
-    // FIXED NEXT ROUND - CYCLES READERS
-    // ==========================================
     async function nextRound() {
         try {
             const roomId = state.currentUser.room_id;
-            
-            // Find current reader index and pick next player in circle
             const currentIdx = state.players.findIndex(p => p.id === state.currentReader);
             const nextIdx = (currentIdx + 1) % state.players.length;
             const nextReader = state.players[nextIdx]?.id;
-            
-            console.log('Current reader index:', currentIdx, 'Next reader index:', nextIdx);
             
             const { error } = await supabaseClient
                 .from('rooms')
@@ -2127,7 +1862,6 @@ async function selectCard(questionId, questionText, category, roomId) {
         try {
             if (state.currentUser) {
                 await supabaseClient.from('players').delete().eq('id', state.currentUser.id);
-                
                 if (state.isHost && state.currentUser.room_id) {
                     await supabaseClient.from('rooms').delete().eq('id', state.currentUser.room_id);
                 }
@@ -2155,7 +1889,6 @@ async function selectCard(questionId, questionText, category, roomId) {
         state.gameState = 'waiting';
         state.doubleDownUsed = false;
         state.scores = {};
-        
         if (state.currentUser?.room_id) {
             loadPlayers(state.currentUser.room_id);
         }
@@ -2163,14 +1896,9 @@ async function selectCard(questionId, questionText, category, roomId) {
 
     function copyRoomCode() {
         const code = document.getElementById('displayRoomCode').textContent;
-        navigator.clipboard.writeText(code).then(() => {
-            showToast('Room code copied!');
-        });
+        navigator.clipboard.writeText(code).then(() => showToast('Room code copied!'));
     }
 
-    // ==========================================
-    // UTILITY FUNCTIONS
-    // ==========================================
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
@@ -2213,5 +1941,6 @@ async function selectCard(questionId, questionText, category, roomId) {
         lastTouchEnd = now;
     }, false);
 </script>
+    
 </body>
 </html>
