@@ -12,7 +12,13 @@
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
         }
+        #readerView, #voterView, #resultsView {
+            display: none;
+        }
 
+        #readerView.active, #voterView.active, #resultsView.active {
+            display: block;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
@@ -1491,37 +1497,70 @@
     }
 
     function initGameView() {
-        console.log('Initializing game view. Current user:', state.currentUser?.id, 'Current reader:', state.currentReader);
-        
-        updateScoreboard();
-        
+    console.log('Initializing game view...');
+    console.log('Current user ID:', state.currentUser?.id);
+    console.log('Current reader ID:', state.currentReader);
+    console.log('Match?', state.currentReader === state.currentUser?.id);
+    
+    // Force a small delay to ensure state is synchronized
+    setTimeout(() => {
         const isReader = state.currentReader === state.currentUser?.id;
-        console.log('Is current user the reader?', isReader);
+        console.log('After delay - Is reader?', isReader);
         
-        document.getElementById('readerView').style.display = isReader ? 'block' : 'none';
-        document.getElementById('voterView').style.display = isReader ? 'none' : 'block';
-        document.getElementById('resultsView').style.display = 'none';
+        const readerView = document.getElementById('readerView');
+        const voterView = document.getElementById('voterView');
+        const resultsView = document.getElementById('resultsView');
+        
+        if (!readerView || !voterView) {
+            console.error('View elements not found!');
+            return;
+        }
+        
+        readerView.style.display = isReader ? 'block' : 'none';
+        voterView.style.display = isReader ? 'none' : 'block';
+        resultsView.style.display = 'none';
         
         if (isReader) {
-            console.log('Showing reader view with Draw Card button');
-            document.getElementById('readerQuestionCard').textContent = 'Tap "Draw Card" when everyone is ready';
-            document.getElementById('drawCardBtn').classList.remove('hidden');
-            document.getElementById('revealBtn').classList.add('hidden');
-            document.getElementById('nextRoundBtn').classList.add('hidden');
+            console.log('SHOWING READER VIEW');
+            const questionCard = document.getElementById('readerQuestionCard');
+            const drawBtn = document.getElementById('drawCardBtn');
+            const revealBtn = document.getElementById('revealBtn');
+            const nextRoundBtn = document.getElementById('nextRoundBtn');
+            
+            if (questionCard) questionCard.textContent = 'Tap "Draw Card" when everyone is ready';
+            if (drawBtn) {
+                drawBtn.classList.remove('hidden');
+                drawBtn.disabled = false;
+                drawBtn.textContent = 'Draw Card';
+            }
+            if (revealBtn) revealBtn.classList.add('hidden');
+            if (nextRoundBtn) nextRoundBtn.classList.add('hidden');
+            
             updateVotingStatus();
         } else {
-            console.log('Showing voter view - waiting for reader');
-            document.getElementById('voterQuestionCard').textContent = 'The reader is drawing a card...';
-            document.getElementById('voterQuestionCard').classList.add('waiting');
-            document.getElementById('voterStatus').textContent = 'Waiting for question...';
-            document.getElementById('voterStatus').classList.remove('active');
+            console.log('SHOWING VOTER VIEW');
+            const voterQuestion = document.getElementById('voterQuestionCard');
+            const voterStatus = document.getElementById('voterStatus');
+            
+            if (voterQuestion) {
+                voterQuestion.textContent = 'The reader is drawing a card...';
+                voterQuestion.classList.add('waiting');
+            }
+            if (voterStatus) {
+                voterStatus.textContent = 'Waiting for question...';
+                voterStatus.classList.remove('active');
+            }
+            
             document.getElementById('doubleDownSection').style.display = 'none';
             document.getElementById('votingSection').style.display = 'none';
             document.getElementById('waitingSection').style.display = 'none';
         }
         
-        state.hasVoted = false;
-    }
+        updateScoreboard();
+    }, 200);
+    
+    state.hasVoted = false;
+}
 
     function updateScoreboard() {
         const board = document.getElementById('scoreboard');
@@ -1998,10 +2037,19 @@
         navigator.clipboard.writeText(code).then(() => showToast('Room code copied!'));
     }
 
-    function showScreen(screenId) {
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        document.getElementById(screenId).classList.add('active');
+   function showScreen(screenId) {
+    // Hide all screens
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    
+    // Show target screen
+    const target = document.getElementById(screenId);
+    if (target) {
+        target.classList.add('active');
+        console.log('Switched to screen:', screenId);
+    } else {
+        console.error('Screen not found:', screenId);
     }
+}
 
     function showToast(message, duration = 3000) {
         const toast = document.getElementById('toast');
