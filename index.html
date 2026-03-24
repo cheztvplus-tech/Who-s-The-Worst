@@ -1459,7 +1459,9 @@
     state.currentQuestion = room.current_question;
     state.currentReader = room.current_reader;
     state.round = room.current_round;
-    
+    state.instigatorVote = room.instigator_vote;
+    state.instigatorVoteConfirmed = !!room.instigator_vote;
+        
     if (room.scores) state.scores = room.scores;
     
     // If game is playing or results, switch to game screen
@@ -1639,22 +1641,38 @@
             if (nextRoundBtn) nextRoundBtn.classList.add('hidden');
             
             updateVotingStatus();
-        } else {
+                } else {
             console.log('SHOWING VOTER VIEW');
             const voterQuestion = document.getElementById('voterQuestionCard');
             const voterStatus = document.getElementById('voterStatus');
             
-            if (voterQuestion) {
-                voterQuestion.textContent = 'The reader is drawing a card...';
+            // Check if question is available
+            if (state.currentQuestion) {
+                voterQuestion.textContent = state.currentQuestion;
+                voterQuestion.classList.remove('waiting');
+                
+                // Check if instigator has voted
+                if (state.instigatorVoteConfirmed) {
+                    voterStatus.textContent = 'Vote now! Guess who the Instigator picked';
+                    voterStatus.classList.add('active');
+                    document.getElementById('doubleDownSection').style.display = 'block';
+                    document.getElementById('votingSection').style.display = 'block';
+                    updateVoteOptions();
+                } else {
+                    voterStatus.textContent = 'Instigator is choosing...';
+                    voterStatus.classList.remove('active');
+                    document.getElementById('doubleDownSection').style.display = 'none';
+                    document.getElementById('votingSection').style.display = 'none';
+                }
+            } else {
+                voterQuestion.textContent = 'The Instigator is drawing a card...';
                 voterQuestion.classList.add('waiting');
-            }
-            if (voterStatus) {
                 voterStatus.textContent = 'Waiting for question...';
                 voterStatus.classList.remove('active');
+                document.getElementById('doubleDownSection').style.display = 'none';
+                document.getElementById('votingSection').style.display = 'none';
             }
             
-            document.getElementById('doubleDownSection').style.display = 'none';
-            document.getElementById('votingSection').style.display = 'none';
             document.getElementById('waitingSection').style.display = 'none';
         }
         
@@ -1663,20 +1681,21 @@
     
     state.hasVoted = false;
 }
-        function showInstigatorVoteOptions() {
-        const container = document.getElementById('readerView');
+            function showInstigatorVoteOptions() {
+        // Remove existing picker if any
         let picker = document.getElementById('instigatorPicker');
         if (picker) picker.remove();
         
         picker = document.createElement('div');
         picker.id = 'instigatorPicker';
         picker.innerHTML = `
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 20px 0;">
+            <h4 style="color: #feca57; margin: 20px 0 15px; text-align: center;">Pick who fits this card:</h4>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px;">
                 ${state.players.filter(p => p.id !== state.currentUser.id).map(p => `
                     <div onclick="selectInstigatorVote('${p.id}')" 
                          id="instigator-vote-${p.id}"
                          style="background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); 
-                                border-radius: 15px; padding: 20px; text-align: center; cursor: pointer;">
+                                border-radius: 15px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s;">
                         <div style="font-size: 1.5rem; margin-bottom: 5px;">${p.name.charAt(0)}</div>
                         <div style="font-weight: 600;">${p.name}</div>
                     </div>
@@ -1688,14 +1707,50 @@
         card.parentNode.insertBefore(picker, card.nextSibling);
     }
 
-    function selectInstigatorVote(playerId) {
+        function selectInstigatorVote(playerId) {
         state.instigatorVote = playerId;
+        
+        // Highlight selected
         document.querySelectorAll('[id^="instigator-vote-"]').forEach(el => {
-            el.style.borderColor = el.id === `instigator-vote-${playerId}` ? '#2ecc71' : 'rgba(255,255,255,0.1)';
+            if (el.id === `instigator-vote-${playerId}`) {
+                el.style.borderColor = '#2ecc71';
+                el.style.background = 'rgba(46, 204, 113, 0.2)';
+            } else {
+                el.style.borderColor = 'rgba(255,255,255,0.1)';
+                el.style.background = 'rgba(255,255,255,0.05)';
+            }
         });
-        document.getElementById('drawCardBtn').disabled = false;
-        showToast('Vote selected! Tap Draw Card to continue');
+        
+        const drawBtn = document.getElementById('drawCardBtn');
+        drawBtn.disabled = false;
+        drawBtn.textContent = 'Confirm Vote';
+        drawBtn.onclick = confirmInstigatorVote;
+        
+        showToast('Player selected! Tap Confirm to lock in');
     }
+
+    // ADD THE NEW FUNCTION HERE:
+    async function confirmInstigatorVote() {
+        if (!state.instigatorVote) return;
+        
+        state.instigatorVoteConfirmed = true;
+        document.getElementById('instigatorPicker')?.remove();
+        
+        const drawBtn = document.getElementById('drawCardBtn');
+        drawBtn.classList.add('hidden');
+        
+        const roomId = state.currentUser.room_id;
+        await supabaseClient
+            .from('rooms')
+            .update({ 
+                instigator_vote: state.instigatorVote 
+            })
+            .eq('id', roomId);
+        
+        showToast('Vote locked! Waiting for others...');
+        updateVotingStatus();
+    }
+        
     function updateScoreboard() {
         const board = document.getElementById('scoreboard');
         const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
@@ -1794,13 +1849,7 @@
     // ==========================================
     // DRAW CARD - SIMPLIFIED VERSION
     // ==========================================
-        async function drawCard() {
-        // If instigator hasn't confirmed vote, confirm it now
-        if (state.currentReader === state.currentUser?.id && state.instigatorVote && !state.instigatorVoteConfirmed) {
-            state.instigatorVoteConfirmed = true;
-            document.getElementById('instigatorPicker')?.remove();
-        }
-        
+            async function drawCard() {
         const btn = document.getElementById('drawCardBtn');
         btn.disabled = true;
         btn.textContent = 'Drawing...';
@@ -1844,7 +1893,7 @@
             
             console.log('Drawn:', drawn.map(d => d.category));
             
-            // Show simple card picker
+            // Show card picker
             showSimpleCardPicker(drawn, roomId);
             
         } catch (error) {
@@ -1901,8 +1950,8 @@
         btn.classList.add('hidden');
     }
 
-    async function selectCard(questionId, questionText, category, roomId) {
-        console.log('Selected:', category);
+        async function selectCard(questionId, questionText, category, roomId) {
+        console.log('Selected card:', category);
         
         try {
             // Remove picker
@@ -1926,13 +1975,19 @@
                 });
             }
             
-            // Update room
+            // Update room with question
             await supabaseClient
                 .from('rooms')
                 .update({ current_question: questionText })
                 .eq('id', roomId);
             
-            showToast('Question revealed! Waiting for votes...');
+            // Now show player picker for Instigator
+            showInstigatorVoteOptions();
+            
+            const drawBtn = document.getElementById('drawCardBtn');
+            drawBtn.textContent = 'Confirm Vote';
+            drawBtn.disabled = true;
+            drawBtn.classList.remove('hidden');
             
         } catch (error) {
             console.error('Select error:', error);
