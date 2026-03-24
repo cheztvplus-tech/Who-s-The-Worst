@@ -1611,18 +1611,29 @@
         voterView.style.display = isReader ? 'none' : 'block';
         resultsView.style.display = 'none';
         
-        if (isReader) {
-            console.log('SHOWING READER VIEW');
+                if (isReader) {
+            console.log('SHOWING INSTIGATOR VIEW');
             const questionCard = document.getElementById('readerQuestionCard');
             const drawBtn = document.getElementById('drawCardBtn');
             const revealBtn = document.getElementById('revealBtn');
             const nextRoundBtn = document.getElementById('nextRoundBtn');
             
-            if (questionCard) questionCard.textContent = 'Tap "Draw Card" when everyone is ready';
-            if (drawBtn) {
-                drawBtn.classList.remove('hidden');
-                drawBtn.disabled = false;
-                drawBtn.textContent = 'Draw Card';
+            // Show player selection first
+            if (!state.instigatorVote) {
+                questionCard.innerHTML = '<div>Pick a player to vote for:</div>';
+                showInstigatorVoteOptions();
+                if (drawBtn) {
+                    drawBtn.textContent = 'Confirm Vote';
+                    drawBtn.disabled = true;
+                    drawBtn.classList.remove('hidden');
+                }
+            } else {
+                questionCard.textContent = 'Tap "Draw Card" to reveal question';
+                if (drawBtn) {
+                    drawBtn.textContent = 'Draw Card';
+                    drawBtn.disabled = false;
+                    drawBtn.classList.remove('hidden');
+                }
             }
             if (revealBtn) revealBtn.classList.add('hidden');
             if (nextRoundBtn) nextRoundBtn.classList.add('hidden');
@@ -1652,7 +1663,39 @@
     
     state.hasVoted = false;
 }
+        function showInstigatorVoteOptions() {
+        const container = document.getElementById('readerView');
+        let picker = document.getElementById('instigatorPicker');
+        if (picker) picker.remove();
+        
+        picker = document.createElement('div');
+        picker.id = 'instigatorPicker';
+        picker.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 20px 0;">
+                ${state.players.filter(p => p.id !== state.currentUser.id).map(p => `
+                    <div onclick="selectInstigatorVote('${p.id}')" 
+                         id="instigator-vote-${p.id}"
+                         style="background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); 
+                                border-radius: 15px; padding: 20px; text-align: center; cursor: pointer;">
+                        <div style="font-size: 1.5rem; margin-bottom: 5px;">${p.name.charAt(0)}</div>
+                        <div style="font-weight: 600;">${p.name}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+        const card = document.getElementById('readerQuestionCard');
+        card.parentNode.insertBefore(picker, card.nextSibling);
+    }
 
+    function selectInstigatorVote(playerId) {
+        state.instigatorVote = playerId;
+        document.querySelectorAll('[id^="instigator-vote-"]').forEach(el => {
+            el.style.borderColor = el.id === `instigator-vote-${playerId}` ? '#2ecc71' : 'rgba(255,255,255,0.1)';
+        });
+        document.getElementById('drawCardBtn').disabled = false;
+        showToast('Vote selected! Tap Draw Card to continue');
+    }
     function updateScoreboard() {
         const board = document.getElementById('scoreboard');
         const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
@@ -1733,7 +1776,7 @@
 
     function updateVoteOptions() {
         const container = document.getElementById('voteOptions');
-        const options = state.players.filter(p => p.id !== state.currentUser?.id);
+        const options = state.players.filter(p => p.id !== state.currentUser?.id && p.id !== state.currentReader);
         
         container.innerHTML = options.map(p => `
             <div class="vote-option" onclick="submitVote('${p.id}')" id="vote-${p.id}">
@@ -1752,6 +1795,9 @@
     // DRAW CARD - SIMPLIFIED VERSION
     // ==========================================
     async function drawCard() {
+        if (state.currentReader === state.currentUser?.id && state.instigatorVote && !state.instigatorVoteConfirmed) {
+            state.instigatorVoteConfirmed = true;
+            document.getElementById('instigatorPicker')?.remove();
         const btn = document.getElementById('drawCardBtn');
         btn.disabled = true;
         btn.textContent = 'Drawing...';
@@ -1893,6 +1939,11 @@
 
     async function submitVote(targetId) {
         if (state.hasVoted) return;
+
+        if (!state.instigatorVoteConfirmed && state.currentReader !== state.currentUser?.id) {
+            showToast('Wait for the Instigator to vote first!');
+            return;
+        }
         
         const doubleDown = document.getElementById('doubleDownBtn').classList.contains('active');
         
@@ -1939,27 +1990,41 @@
         try {
             const roomId = state.currentUser.room_id;
             
-            const voteCounts = {};
-            Object.values(state.votes).forEach(v => {
-                voteCounts[v.target] = (voteCounts[v.target] || 0) + 1;
-            });
-            
-            let maxVotes = 0;
-            let majority = null;
-            Object.entries(voteCounts).forEach(([target, count]) => {
-                if (count > maxVotes) {
-                    maxVotes = count;
-                    majority = target;
-                }
-            });
-            
+                        const instigatorTarget = state.instigatorVote;
             const newScores = { ...state.scores };
+            
+            // Count who voted for what
+            const voteCounts = {};
             Object.entries(state.votes).forEach(([voterId, vote]) => {
-                if (vote.target === majority) {
+                voteCounts[vote.target] = (voteCounts[vote.target] || 0) + 1;
+            });
+            
+            // Check if anyone matched Instigator
+            const matchers = Object.entries(state.votes).filter(([voterId, vote]) => vote.target === instigatorTarget);
+            
+            if (matchers.length > 0) {
+                // Players who matched get points
+                matchers.forEach(([voterId, vote]) => {
                     const points = vote.doubleDown ? 2 : 1;
                     newScores[voterId] = (newScores[voterId] || 0) + points;
-                }
-            });
+                });
+            } else {
+                // No one matched - majority gets 1 point
+                let maxVotes = 0;
+                let majority = null;
+                Object.entries(voteCounts).forEach(([target, count]) => {
+                    if (count > maxVotes) {
+                        maxVotes = count;
+                        majority = target;
+                    }
+                });
+                Object.entries(state.votes).forEach(([voterId, vote]) => {
+                    if (vote.target === majority) {
+                        newScores[voterId] = (newScores[voterId] || 0) + 1;
+                    }
+                });
+            }
+            // Instigator never gets points
             
             const { error } = await supabaseClient
                 .from('rooms')
@@ -2044,6 +2109,10 @@
                     last_majority: null
                 })
                 .eq('id', roomId);
+
+            // Reset instigator vote for next round
+            state.instigatorVote = null;
+            state.instigatorVoteConfirmed = false;
             
             await supabaseClient
                 .from('votes')
