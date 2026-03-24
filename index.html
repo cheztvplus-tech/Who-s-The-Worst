@@ -958,1016 +958,1113 @@
     <div id="toast" class="toast"></div>
 
     <script>
-        // ==========================================
-        // CONFIGURATION - ONLY DECLARE SUPABASE ONCE
-        // ==========================================
-        const SUPABASE_URL = 'https://porpqvphytecuidomcgy.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvcnBxdnBoeXRlY3VpZG9tY2d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQwODUsImV4cCI6MjA4OTgxMDA4NX0.IFECuGpxl4HcMfFx7oqmbsVdeOLMK_4wvEi2L-NGNzI';
-        const ADMIN_PASSWORD = 'worst123';
+    // ==========================================
+    // CONFIGURATION
+    // ==========================================
+    const SUPABASE_URL = 'https://porpqvphytecuidomcgy.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvcnBxdnBoeXRlY3VpZG9tY2d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQwODUsImV4cCI6MjA4OTgxMDA4NX0.IFECuGpxl4HcMfFx7oqmbsVdeOLMK_4wvEi2L-NGNzI';
+    const ADMIN_PASSWORD = 'worst123';
 
-        // ==========================================
-        // GLOBAL VARIABLES - DECLARED ONCE
-        // ==========================================
-        let supabaseClient = null;  // Changed name to avoid conflicts
-        let realtimeChannel = null;
-        let isAdminLoggedIn = false;
+    // ==========================================
+    // GLOBAL VARIABLES
+    // ==========================================
+    let supabaseClient = null;
+    let realtimeChannel = null;
+    let isAdminLoggedIn = false;
 
-        const CONFIG = {
-            MIN_PLAYERS: 3,
-            POINTS_TO_WIN: 7,
-            QUESTIONS: []
-        };
+    const CONFIG = {
+        MIN_PLAYERS: 3,
+        POINTS_TO_WIN: 7,
+        QUESTIONS: []
+    };
 
-        const state = {
-            currentUser: null,
-            roomCode: null,
-            isHost: false,
-            players: [],
-            gameState: 'waiting',
-            currentQuestion: null,
-            currentReader: null,
-            votes: {},
-            scores: {},
-            doubleDownUsed: false,
-            hasVoted: false,
-            round: 1
-        };
+    const state = {
+        currentUser: null,
+        roomCode: null,
+        isHost: false,
+        players: [],
+        gameState: 'waiting',
+        currentQuestion: null,
+        currentReader: null,
+        votes: {},
+        scores: {},
+        doubleDownUsed: false,
+        hasVoted: false,
+        round: 1
+    };
 
-        // ==========================================
-        // INITIALIZATION
-        // ==========================================
-        window.onload = function() {
-            initSupabase();
-        };
+    // ==========================================
+    // INITIALIZATION
+    // ==========================================
+    window.onload = function() {
+        initSupabase();
+    };
 
-        async function initSupabase() {
-            try {
-                // Create client only once
-                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                
-                // Test connection
-                const { error } = await supabaseClient.from('rooms').select('count', { count: 'exact', head: true });
-                
-                if (error && error.code !== 'PGRST116') {
-                    throw error;
-                }
-                
-                updateConnectionStatus(true);
-                await loadQuestionsFromSupabase();
-                showScreen('joinScreen');
-                showToast(`Connected! Loaded ${CONFIG.QUESTIONS.length} questions`);
-                
-            } catch (error) {
-                console.error('Connection error:', error);
-                updateConnectionStatus(false);
-                showScreen('joinScreen');
-                showToast('Connection failed. Check console.');
-            }
-        }
-
-        // ==========================================
-        // ADMIN FUNCTIONS
-        // ==========================================
-        function showAdminLogin() {
-            showScreen('adminLoginScreen');
-        }
-
-        function adminLogin() {
-            const password = document.getElementById('adminPassword').value;
+    async function initSupabase() {
+        try {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
             
-            if (password === ADMIN_PASSWORD) {
-                isAdminLoggedIn = true;
-                showScreen('adminScreen');
-                document.getElementById('adminLoginError').classList.remove('show');
-                document.getElementById('adminPassword').value = '';
-            } else {
-                showError('adminLoginError', 'Wrong password');
+            const { error } = await supabaseClient.from('rooms').select('count', { count: 'exact', head: true });
+            
+            if (error && error.code !== 'PGRST116') {
+                throw error;
             }
-        }
-
-        function logoutAdmin() {
-            isAdminLoggedIn = false;
+            
+            updateConnectionStatus(true);
+            await loadQuestionsFromSupabase();
             showScreen('joinScreen');
-        }
-
-        function switchTab(tab) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            showToast(`Connected! Loaded ${CONFIG.QUESTIONS.length} questions`);
             
-            event.target.classList.add('active');
-            document.getElementById(tab + 'Tab').classList.add('active');
-            
-            if (tab === 'view') {
-                loadQuestionsList();
-            }
+        } catch (error) {
+            console.error('Connection error:', error);
+            updateConnectionStatus(false);
+            showScreen('joinScreen');
+            showToast('Connection failed. Check console.');
         }
+    }
 
-        // ==========================================
-        // QUESTIONS MANAGEMENT
-        // ==========================================
-        async function loadQuestionsFromSupabase() {
-            try {
-                const { data: questions, error } = await supabaseClient
-                    .from('questions')
-                    .select('*')
-                    .order('created_at', { ascending: true });
-                
-                if (error) throw error;
-                
-                if (questions && questions.length > 0) {
-                    CONFIG.QUESTIONS = questions.map(q => ({
-                        text: q.question_text,
-                        category: q.category
-                    }));
-                } else {
-                    CONFIG.QUESTIONS = getDefaultQuestions();
-                }
-                
-            } catch (error) {
-                console.error('Error loading questions:', error);
-                CONFIG.QUESTIONS = getDefaultQuestions();
-            }
+    // ==========================================
+    // ADMIN FUNCTIONS
+    // ==========================================
+    function showAdminLogin() {
+        showScreen('adminLoginScreen');
+    }
+
+    function adminLogin() {
+        const password = document.getElementById('adminPassword').value;
+        
+        if (password === ADMIN_PASSWORD) {
+            isAdminLoggedIn = true;
+            showScreen('adminScreen');
+            document.getElementById('adminLoginError').classList.remove('show');
+            document.getElementById('adminPassword').value = '';
+        } else {
+            showError('adminLoginError', 'Wrong password');
         }
+    }
 
-        function getDefaultQuestions() {
-            return [
-                { text: "Who would survive the longest in a zombie apocalypse?", category: "Random" },
-                { text: "Who has the worst taste in romantic partners?", category: "Savage" },
-                { text: "Who would sell their soul for the least amount of money?", category: "Savage" },
-                { text: "Who would be the most likely to fake their own death?", category: "Random" },
-                { text: "Who would be the worst parent?", category: "Brutal" },
-                { text: "Who has done the most 'walks of shame'?", category: "Embarrassing" },
-                { text: "Who would start a cult and actually succeed?", category: "Random" },
-                { text: "Who is most likely to get catfished online?", category: "Embarrassing" },
-                { text: "Who would throw their friend under the bus to save themselves?", category: "Brutal" },
-                { text: "Who has the most embarrassing search history?", category: "Embarrassing" }
-            ];
+    function logoutAdmin() {
+        isAdminLoggedIn = false;
+        showScreen('joinScreen');
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        
+        event.target.classList.add('active');
+        document.getElementById(tab + 'Tab').classList.add('active');
+        
+        if (tab === 'view') {
+            loadQuestionsList();
         }
+    }
 
-        function getRandomQuestion() {
-            if (CONFIG.QUESTIONS.length === 0) {
-                return "Who is the worst? (No questions loaded)";
-            }
-            const q = CONFIG.QUESTIONS[Math.floor(Math.random() * CONFIG.QUESTIONS.length)];
-            return q.text || q;
-        }
-
-        async function addNewQuestion() {
-            const input = document.getElementById('newQuestionInput');
-            const category = document.getElementById('questionCategory');
-            const text = input.value.trim();
-            
-            if (!text) {
-                showError('adminError', 'Enter a question');
-                return;
-            }
-            
-            if (!text.toLowerCase().startsWith('who')) {
-                showError('adminError', 'Question should start with "Who"');
-                return;
-            }
-            
-            try {
-                const { data, error } = await supabaseClient
-                    .from('questions')
-                    .insert({
-                        question_text: text,
-                        category: category.value,
-                        is_default: false
-                    })
-                    .select()
-                    .single();
-                
-                if (error) throw error;
-                
-                input.value = '';
-                showToast('Question added!');
-                await loadQuestionsFromSupabase();
-                
-            } catch (error) {
-                showError('adminError', error.message);
-            }
-        }
-
-        async function loadQuestionsList() {
+    // ==========================================
+    // QUESTIONS MANAGEMENT
+    // ==========================================
+    async function loadQuestionsFromSupabase() {
+        try {
             const { data: questions, error } = await supabaseClient
                 .from('questions')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: true });
             
-            if (error) {
-                document.getElementById('questionsList').innerHTML = 'Error loading questions';
-                return;
+            if (error) throw error;
+            
+            if (questions && questions.length > 0) {
+                CONFIG.QUESTIONS = questions.map(q => ({
+                    id: q.id,
+                    text: q.question_text,
+                    category: q.category
+                }));
+            } else {
+                CONFIG.QUESTIONS = getDefaultQuestions();
             }
             
-            document.getElementById('questionCount').textContent = questions.length;
+        } catch (error) {
+            console.error('Error loading questions:', error);
+            CONFIG.QUESTIONS = getDefaultQuestions();
+        }
+    }
+
+    function getDefaultQuestions() {
+        return [
+            { id: '1', text: "Who would survive the longest in a zombie apocalypse?", category: "Random" },
+            { id: '2', text: "Who has the worst taste in romantic partners?", category: "Savage" },
+            { id: '3', text: "Who would sell their soul for the least amount of money?", category: "Savage" },
+            { id: '4', text: "Who would be the most likely to fake their own death?", category: "Random" },
+            { id: '5', text: "Who would be the worst parent?", category: "Brutal" },
+            { id: '6', text: "Who has done the most 'walks of shame'?", category: "Embarrassing" },
+            { id: '7', text: "Who would start a cult and actually succeed?", category: "Random" },
+            { id: '8', text: "Who is most likely to get catfished online?", category: "Embarrassing" },
+            { id: '9', text: "Who would throw their friend under the bus to save themselves?", category: "Brutal" },
+            { id: '10', text: "Who has the most embarrassing search history?", category: "Embarrassing" }
+        ];
+    }
+
+    function getRandomQuestion() {
+        if (CONFIG.QUESTIONS.length === 0) {
+            return { text: "Who is the worst? (No questions loaded)", id: null };
+        }
+        const q = CONFIG.QUESTIONS[Math.floor(Math.random() * CONFIG.QUESTIONS.length)];
+        return q;
+    }
+
+    async function addNewQuestion() {
+        const input = document.getElementById('newQuestionInput');
+        const category = document.getElementById('questionCategory');
+        const text = input.value.trim();
+        
+        if (!text) {
+            showError('adminError', 'Enter a question');
+            return;
+        }
+        
+        if (!text.toLowerCase().startsWith('who')) {
+            showError('adminError', 'Question should start with "Who"');
+            return;
+        }
+        
+        try {
+            const { data, error } = await supabaseClient
+                .from('questions')
+                .insert({
+                    question_text: text,
+                    category: category.value,
+                    is_default: false
+                })
+                .select()
+                .single();
             
-            const list = document.getElementById('questionsList');
-            list.innerHTML = questions.map(q => `
-                <div class="question-item" style="border-left-color: ${q.is_default ? '#feca57' : '#3ec1d3'};">
-                    <div class="question-category">${q.category}</div>
-                    <div>${q.question_text}</div>
+            if (error) throw error;
+            
+            input.value = '';
+            showToast('Question added!');
+            await loadQuestionsFromSupabase();
+            
+        } catch (error) {
+            showError('adminError', error.message);
+        }
+    }
+
+    async function loadQuestionsList() {
+        const { data: questions, error } = await supabaseClient
+            .from('questions')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (error) {
+            document.getElementById('questionsList').innerHTML = 'Error loading questions';
+            return;
+        }
+        
+        document.getElementById('questionCount').textContent = questions.length;
+        
+        const list = document.getElementById('questionsList');
+        list.innerHTML = questions.map(q => `
+            <div class="question-item" style="border-left-color: ${q.is_default ? '#feca57' : '#3ec1d3'};">
+                <div class="question-category">${q.category}</div>
+                <div>${q.question_text}</div>
+            </div>
+        `).join('');
+    }
+
+    // ==========================================
+    // ROOM MANAGEMENT
+    // ==========================================
+    async function createRoom() {
+        const username = document.getElementById('usernameInput').value.trim();
+        
+        if (!username) {
+            showError('joinError', 'Enter your name first');
+            return;
+        }
+        
+        if (username.length < 2) {
+            showError('joinError', 'Name too short');
+            return;
+        }
+        
+        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        
+        try {
+            const { data: room, error } = await supabaseClient
+                .from('rooms')
+                .insert({
+                    code: code,
+                    game_state: 'waiting',
+                    current_round: 1,
+                    created_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+            
+            if (error) throw error;
+            
+            const { data: player, error: playerError } = await supabaseClient
+                .from('players')
+                .insert({
+                    room_id: room.id,
+                    name: username,
+                    is_host: true,
+                    double_down_used: false,
+                    joined_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+            
+            if (playerError) throw playerError;
+            
+            state.currentUser = player;
+            state.roomCode = code;
+            state.isHost = true;
+            
+            enterLobby(room.id);
+            
+        } catch (error) {
+            console.error('Create room error:', error);
+            showError('joinError', 'Failed to create room: ' + error.message);
+        }
+    }
+
+    async function joinGame() {
+        const username = document.getElementById('usernameInput').value.trim();
+        const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+        const btn = document.getElementById('joinBtn');
+        
+        if (!username) return showError('joinError', 'Enter your name');
+        if (!roomCode) return showError('joinError', 'Enter room code');
+        if (username.length < 2) return showError('joinError', 'Name too short');
+        
+        btn.disabled = true;
+        btn.innerHTML = 'Joining... <div class="loading"></div>';
+        
+        try {
+            const { data: room, error: roomError } = await supabaseClient
+                .from('rooms')
+                .select('*')
+                .eq('code', roomCode)
+                .single();
+            
+            if (roomError || !room) {
+                throw new Error('Room not found');
+            }
+            
+            if (room.game_state !== 'waiting') {
+                throw new Error('Game already started');
+            }
+            
+            const { data: existingPlayers, error: countError } = await supabaseClient
+                .from('players')
+                .select('*')
+                .eq('room_id', room.id);
+            
+            if (existingPlayers && existingPlayers.length >= 15) {
+                throw new Error('Room full');
+            }
+            
+            if (existingPlayers && existingPlayers.find(p => p.name === username)) {
+                throw new Error('Name taken');
+            }
+            
+            const { data: player, error: playerError } = await supabaseClient
+                .from('players')
+                .insert({
+                    room_id: room.id,
+                    name: username,
+                    is_host: existingPlayers.length === 0,
+                    double_down_used: false,
+                    joined_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+            
+            if (playerError) throw playerError;
+            
+            state.currentUser = player;
+            state.roomCode = roomCode;
+            state.isHost = existingPlayers.length === 0;
+            
+            enterLobby(room.id);
+            
+        } catch (error) {
+            console.error('Join game error:', error);
+            showError('joinError', error.message);
+            btn.disabled = false;
+            btn.textContent = 'Join Game';
+        }
+    }
+
+    function enterLobby(roomId) {
+        showScreen('lobbyScreen');
+        document.getElementById('displayRoomCode').textContent = state.roomCode;
+        
+        if (state.isHost) {
+            document.getElementById('hostControls').style.display = 'block';
+            document.getElementById('waitingMessage').style.display = 'none';
+            document.getElementById('playerRole').textContent = 'Host';
+        } else {
+            document.getElementById('playerRole').textContent = 'Player';
+        }
+        
+        subscribeToRoom(roomId);
+    }
+
+    // ==========================================
+    // REALTIME SUBSCRIPTION
+    // ==========================================
+    function subscribeToRoom(roomId) {
+        realtimeChannel = supabaseClient
+            .channel('room:' + roomId)
+            .on('postgres_changes', 
+                { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId },
+                (payload) => handleRoomChange(payload.new)
+            )
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'players', filter: 'room_id=eq.' + roomId },
+                () => loadPlayers(roomId)
+            )
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'votes', filter: 'room_id=eq.' + roomId },
+                () => loadVotes(roomId)
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    updateConnectionStatus(true);
+                    loadPlayers(roomId);
+                }
+            });
+    }
+
+    async function loadPlayers(roomId) {
+        const { data: players, error } = await supabaseClient
+            .from('players')
+            .select('*')
+            .eq('room_id', roomId)
+            .order('joined_at', { ascending: true });
+        
+        if (error) {
+            console.error('Load players error:', error);
+            return;
+        }
+        
+        state.players = players;
+        updateLobby();
+        
+        const updatedMe = players.find(p => p.id === state.currentUser?.id);
+        if (updatedMe) {
+            state.currentUser = updatedMe;
+            state.isHost = updatedMe.is_host;
+        }
+    }
+
+    async function loadVotes(roomId) {
+        const { data: votes, error } = await supabaseClient
+            .from('votes')
+            .select('*')
+            .eq('room_id', roomId)
+            .eq('round', state.round);
+        
+        if (error) {
+            console.error('Load votes error:', error);
+            return;
+        }
+        
+        state.votes = {};
+        votes.forEach(v => {
+            state.votes[v.player_id] = {
+                target: v.target_id,
+                doubleDown: v.double_down
+            };
+        });
+        
+        updateVotingStatus();
+    }
+
+    function handleRoomChange(room) {
+        if (!room) return;
+        
+        state.gameState = room.game_state;
+        state.currentQuestion = room.current_question;
+        state.currentReader = room.current_reader;
+        state.round = room.current_round;
+        
+        if (room.scores) {
+            state.scores = room.scores;
+        }
+        
+        if (state.gameState === 'playing' || state.gameState === 'results') {
+            if (document.getElementById('lobbyScreen').classList.contains('active')) {
+                showScreen('gameScreen');
+            }
+            updateGameView();
+        }
+        
+        if (state.scores && Object.entries(state.scores).length > 0) {
+            const winner = Object.entries(state.scores).find(([id, score]) => score >= CONFIG.POINTS_TO_WIN);
+            if (winner && !document.getElementById('winnerScreen').classList.contains('active')) {
+                showWinner(winner[0]);
+            }
+        }
+    }
+
+    // ==========================================
+    // GAME LOGIC
+    // ==========================================
+    function updateLobby() {
+        document.getElementById('playerCount').textContent = state.players.length;
+        
+        const grid = document.getElementById('lobbyPlayers');
+        if (state.players.length === 0) {
+            grid.innerHTML = '<div class="empty-state" style="grid-column: 1/-1;"><div class="empty-state-icon">👥</div><p>No players yet</p></div>';
+        } else {
+            grid.innerHTML = state.players.map(p => `
+                <div class="player-card ${p.id === state.currentUser?.id ? 'current-user' : ''}">
+                    <div class="player-avatar">${p.name.charAt(0).toUpperCase()}</div>
+                    <div class="player-name">${p.name}</div>
+                    <div class="player-status">${p.is_host ? '👑 Host' : 'Player'}</div>
                 </div>
             `).join('');
         }
-
-        // ==========================================
-        // ROOM MANAGEMENT
-        // ==========================================
-        async function createRoom() {
-            const username = document.getElementById('usernameInput').value.trim();
+        
+        if (state.isHost) {
+            const canStart = state.players.length >= CONFIG.MIN_PLAYERS;
+            const startBtn = document.getElementById('startBtn');
+            const status = document.getElementById('startStatus');
             
-            if (!username) {
-                showError('joinError', 'Enter your name first');
-                return;
-            }
-            
-            if (username.length < 2) {
-                showError('joinError', 'Name too short');
-                return;
-            }
-            
-            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-            
-            try {
-                const { data: room, error } = await supabaseClient
-                    .from('rooms')
-                    .insert({
-                        code: code,
-                        game_state: 'waiting',
-                        current_round: 1,
-                        created_at: new Date().toISOString()
-                    })
-                    .select()
-                    .single();
-                
-                if (error) throw error;
-                
-                const { data: player, error: playerError } = await supabaseClient
-                    .from('players')
-                    .insert({
-                        room_id: room.id,
-                        name: username,
-                        is_host: true,
-                        double_down_used: false,
-                        joined_at: new Date().toISOString()
-                    })
-                    .select()
-                    .single();
-                
-                if (playerError) throw playerError;
-                
-                state.currentUser = player;
-                state.roomCode = code;
-                state.isHost = true;
-                
-                enterLobby(room.id);
-                
-            } catch (error) {
-                console.error('Create room error:', error);
-                showError('joinError', 'Failed to create room: ' + error.message);
-            }
-        }
-
-        async function joinGame() {
-            const username = document.getElementById('usernameInput').value.trim();
-            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-            const btn = document.getElementById('joinBtn');
-            
-            if (!username) return showError('joinError', 'Enter your name');
-            if (!roomCode) return showError('joinError', 'Enter room code');
-            if (username.length < 2) return showError('joinError', 'Name too short');
-            
-            btn.disabled = true;
-            btn.innerHTML = 'Joining... <div class="loading"></div>';
-            
-            try {
-                const { data: room, error: roomError } = await supabaseClient
-                    .from('rooms')
-                    .select('*')
-                    .eq('code', roomCode)
-                    .single();
-                
-                if (roomError || !room) {
-                    throw new Error('Room not found');
-                }
-                
-                if (room.game_state !== 'waiting') {
-                    throw new Error('Game already started');
-                }
-                
-                const { data: existingPlayers, error: countError } = await supabaseClient
-                    .from('players')
-                    .select('*')
-                    .eq('room_id', room.id);
-                
-                if (existingPlayers && existingPlayers.length >= 15) {
-                    throw new Error('Room full');
-                }
-                
-                if (existingPlayers && existingPlayers.find(p => p.name === username)) {
-                    throw new Error('Name taken');
-                }
-                
-                const { data: player, error: playerError } = await supabaseClient
-                    .from('players')
-                    .insert({
-                        room_id: room.id,
-                        name: username,
-                        is_host: existingPlayers.length === 0,
-                        double_down_used: false,
-                        joined_at: new Date().toISOString()
-                    })
-                    .select()
-                    .single();
-                
-                if (playerError) throw playerError;
-                
-                state.currentUser = player;
-                state.roomCode = roomCode;
-                state.isHost = existingPlayers.length === 0;
-                
-                enterLobby(room.id);
-                
-            } catch (error) {
-                console.error('Join game error:', error);
-                showError('joinError', error.message);
-                btn.disabled = false;
-                btn.textContent = 'Join Game';
-            }
-        }
-
-        function enterLobby(roomId) {
-            showScreen('lobbyScreen');
-            document.getElementById('displayRoomCode').textContent = state.roomCode;
-            
-            if (state.isHost) {
-                document.getElementById('hostControls').style.display = 'block';
-                document.getElementById('waitingMessage').style.display = 'none';
-                document.getElementById('playerRole').textContent = 'Host';
+            startBtn.disabled = !canStart;
+            if (canStart) {
+                status.textContent = `Ready to start! (${state.players.length} players)`;
+                status.classList.add('active');
             } else {
-                document.getElementById('playerRole').textContent = 'Player';
-            }
-            
-            subscribeToRoom(roomId);
-        }
-
-        // ==========================================
-        // REALTIME SUBSCRIPTION
-        // ==========================================
-        function subscribeToRoom(roomId) {
-            realtimeChannel = supabaseClient
-                .channel('room:' + roomId)
-                .on('postgres_changes', 
-                    { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId },
-                    (payload) => handleRoomChange(payload.new)
-                )
-                .on('postgres_changes',
-                    { event: '*', schema: 'public', table: 'players', filter: 'room_id=eq.' + roomId },
-                    () => loadPlayers(roomId)
-                )
-                .on('postgres_changes',
-                    { event: '*', schema: 'public', table: 'votes', filter: 'room_id=eq.' + roomId },
-                    () => loadVotes(roomId)
-                )
-                .subscribe((status) => {
-                    if (status === 'SUBSCRIBED') {
-                        updateConnectionStatus(true);
-                        loadPlayers(roomId);
-                    }
-                });
-        }
-
-        async function loadPlayers(roomId) {
-            const { data: players, error } = await supabaseClient
-                .from('players')
-                .select('*')
-                .eq('room_id', roomId)
-                .order('joined_at', { ascending: true });
-            
-            if (error) {
-                console.error('Load players error:', error);
-                return;
-            }
-            
-            state.players = players;
-            updateLobby();
-            
-            const updatedMe = players.find(p => p.id === state.currentUser?.id);
-            if (updatedMe) {
-                state.currentUser = updatedMe;
-                state.isHost = updatedMe.is_host;
+                status.textContent = `Need ${CONFIG.MIN_PLAYERS - state.players.length} more player(s)`;
+                status.classList.remove('active');
             }
         }
+    }
 
-        async function loadVotes(roomId) {
-            const { data: votes, error } = await supabaseClient
+    async function startGame() {
+        if (!state.isHost) return;
+        
+        const btn = document.getElementById('startBtn');
+        btn.disabled = true;
+        btn.textContent = 'Starting...';
+        
+        try {
+            const roomId = state.currentUser.room_id;
+            
+            // Pick random starting reader
+            const randomIndex = Math.floor(Math.random() * state.players.length);
+            const startingReader = state.players[randomIndex]?.id;
+            
+            const scores = {};
+            state.players.forEach(p => scores[p.id] = 0);
+            
+            const { error } = await supabaseClient
+                .from('rooms')
+                .update({
+                    game_state: 'playing',
+                    current_reader: startingReader, // Random first reader
+                    scores: scores,
+                    started_at: new Date().toISOString()
+                })
+                .eq('id', roomId);
+            
+            if (error) throw error;
+            
+            showScreen('gameScreen');
+            initGameView();
+            
+        } catch (error) {
+            console.error('Start game error:', error);
+            showToast('Failed to start: ' + error.message);
+            btn.disabled = false;
+            btn.textContent = 'Start Game';
+        }
+    }
+
+    function initGameView() {
+        updateScoreboard();
+        
+        const isReader = state.currentReader === state.currentUser?.id;
+        
+        document.getElementById('readerView').style.display = isReader ? 'block' : 'none';
+        document.getElementById('voterView').style.display = isReader ? 'none' : 'block';
+        document.getElementById('resultsView').style.display = 'none';
+        
+        if (isReader) {
+            document.getElementById('readerQuestionCard').textContent = 'Tap "Draw Card" when everyone is ready';
+            document.getElementById('drawCardBtn').classList.remove('hidden');
+            document.getElementById('revealBtn').classList.add('hidden');
+            document.getElementById('nextRoundBtn').classList.add('hidden');
+            updateVotingStatus();
+        } else {
+            document.getElementById('voterQuestionCard').textContent = 'The reader is drawing a card...';
+            document.getElementById('voterQuestionCard').classList.add('waiting');
+            document.getElementById('voterStatus').textContent = 'Waiting for question...';
+            document.getElementById('voterStatus').classList.remove('active');
+            document.getElementById('doubleDownSection').style.display = 'none';
+            document.getElementById('votingSection').style.display = 'none';
+            document.getElementById('waitingSection').style.display = 'none';
+        }
+        
+        state.hasVoted = false;
+    }
+
+    function updateScoreboard() {
+        const board = document.getElementById('scoreboard');
+        const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
+        const maxScore = sorted.length > 0 ? sorted[0][1] : 0;
+        
+        board.innerHTML = sorted.map(([playerId, score]) => {
+            const player = state.players.find(p => p.id === playerId);
+            if (!player) return '';
+            return `
+                <div class="score-item ${score === maxScore && score > 0 ? 'leading' : ''}">
+                    <div class="score-value">${score}</div>
+                    <div class="score-name">${player.name}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function updateGameView() {
+        updateScoreboard();
+        
+        const isReader = state.currentReader === state.currentUser?.id;
+        
+        if (state.currentQuestion) {
+            if (isReader) {
+                document.getElementById('readerQuestionCard').textContent = state.currentQuestion;
+                document.getElementById('drawCardBtn').classList.add('hidden');
+                
+                const voters = state.players.filter(p => p.id !== state.currentReader);
+                const allVoted = voters.every(p => state.votes[p.id]);
+                
+                const revealBtn = document.getElementById('revealBtn');
+                if (allVoted && revealBtn.classList.contains('hidden')) {
+                    revealBtn.classList.remove('hidden');
+                    showToast('Everyone voted!');
+                }
+                
+                updateVotingStatus();
+            } else if (!state.hasVoted) {
+                document.getElementById('voterQuestionCard').textContent = state.currentQuestion;
+                document.getElementById('voterQuestionCard').classList.remove('waiting');
+                document.getElementById('voterStatus').textContent = 'Vote now!';
+                document.getElementById('voterStatus').classList.add('active');
+                document.getElementById('doubleDownSection').style.display = 'block';
+                document.getElementById('votingSection').style.display = 'block';
+                
+                const ddBtn = document.getElementById('doubleDownBtn');
+                if (state.currentUser?.double_down_used) {
+                    ddBtn.classList.add('used');
+                    ddBtn.disabled = true;
+                } else {
+                    ddBtn.classList.remove('used', 'active');
+                    ddBtn.disabled = false;
+                }
+                
+                updateVoteOptions();
+            }
+        }
+        
+        if (state.gameState === 'results') {
+            showResults();
+        }
+    }
+
+    function updateVotingStatus() {
+        const container = document.getElementById('votingStatus');
+        const voters = state.players.filter(p => p.id !== state.currentReader);
+        
+        container.innerHTML = voters.map(p => {
+            const hasVoted = state.votes[p.id];
+            return `
+                <div class="player-card ${hasVoted ? 'voted' : ''}" style="padding: 8px;">
+                    <div class="player-avatar" style="width: 35px; height: 35px; font-size: 1rem;">${p.name.charAt(0)}</div>
+                    <div style="font-size: 0.7rem;">${hasVoted ? '✓' : '...'}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function updateVoteOptions() {
+        const container = document.getElementById('voteOptions');
+        const options = state.players.filter(p => p.id !== state.currentUser?.id);
+        
+        container.innerHTML = options.map(p => `
+            <div class="vote-option" onclick="submitVote('${p.id}')" id="vote-${p.id}">
+                <div style="font-size: 1.5rem; margin-bottom: 5px;">${p.name.charAt(0)}</div>
+                <div style="font-weight: 600;">${p.name}</div>
+            </div>
+        `).join('');
+    }
+
+    function toggleDoubleDown() {
+        const btn = document.getElementById('doubleDownBtn');
+        btn.classList.toggle('active');
+    }
+
+    // ==========================================
+    // FIXED DRAW CARD FUNCTION
+    // ==========================================
+    // ==========================================
+// 3-CARD DRAW MECHANIC
+// ==========================================
+async function drawCard() {
+    const btn = document.getElementById('drawCardBtn');
+    btn.disabled = true;
+    btn.textContent = 'Drawing...';
+    
+    try {
+        const roomId = state.currentUser.room_id;
+        
+        // Get already used question IDs for this room
+        const { data: usedQs, error: usedError } = await supabaseClient
+            .from('used_questions')
+            .select('question_id')
+            .eq('room_id', roomId);
+        
+        if (usedError) throw usedError;
+        
+        const usedIds = usedQs?.map(uq => uq.question_id) || [];
+        
+        // Get available questions
+        let availableQuestions = CONFIG.QUESTIONS.filter(q => !usedIds.includes(q.id));
+        
+        // If not enough questions available, reset used questions
+        if (availableQuestions.length < 3) {
+            console.log('Resetting used questions...');
+            await supabaseClient
+                .from('used_questions')
+                .delete()
+                .eq('room_id', roomId);
+            availableQuestions = CONFIG.QUESTIONS;
+        }
+        
+        if (availableQuestions.length === 0) {
+            throw new Error('No questions available');
+        }
+        
+        // Draw 3 random questions (or fewer if not enough available)
+        const numCards = Math.min(3, availableQuestions.length);
+        const drawnCards = [];
+        const tempQuestions = [...availableQuestions];
+        
+        for (let i = 0; i < numCards; i++) {
+            const randomIdx = Math.floor(Math.random() * tempQuestions.length);
+            drawnCards.push(tempQuestions[randomIdx]);
+            tempQuestions.splice(randomIdx, 1); // Remove so we don't pick duplicates
+        }
+        
+        console.log('Drawn cards:', drawnCards);
+        
+        // Show card picker UI
+        showCardPicker(drawnCards, roomId);
+        
+    } catch (error) {
+        console.error('Draw card error:', error);
+        showToast('Failed to draw cards: ' + error.message);
+        btn.disabled = false;
+        btn.textContent = 'Draw Card';
+    }
+}
+
+function showCardPicker(cards, roomId) {
+    // Hide the draw button and show card selection
+    const readerView = document.getElementById('readerView');
+    
+    // Create card picker HTML
+    const pickerHTML = `
+        <div class="card-picker" style="text-align: center; margin-bottom: 20px;">
+            <h3 style="color: #feca57; margin-bottom: 20px;">Pick a Question</h3>
+            <div class="cards-container" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px;">
+                ${cards.map((card, index) => `
+                    <div class="question-card-option" onclick="selectCard('${card.id}', '${card.text.replace(/'/g, "\\'")}', '${roomId}')" 
+                         style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                border-radius: 15px;
+                                padding: 20px;
+                                width: 150px;
+                                min-height: 120px;
+                                cursor: pointer;
+                                transition: transform 0.2s, box-shadow 0.2s;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                font-size: 0.9rem;
+                                border: 3px solid transparent;"
+                         onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 10px 25px rgba(102, 126, 234, 0.4)';"
+                         onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                        <div>
+                            <div style="font-size: 2rem; margin-bottom: 10px;">🎴</div>
+                            <div>Card ${index + 1}</div>
+                            <div style="font-size: 0.7rem; margin-top: 5px; opacity: 0.7;">${card.category || 'Question'}</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            <p style="color: #a0a0a0; font-size: 0.9rem;">Tap a card to reveal and read the question</p>
+        </div>
+    `;
+    
+    // Insert picker before the action buttons
+    const existingPicker = document.getElementById('cardPicker');
+    if (existingPicker) existingPicker.remove();
+    
+    const pickerDiv = document.createElement('div');
+    pickerDiv.id = 'cardPicker';
+    pickerDiv.innerHTML = pickerHTML;
+    
+    const questionCard = document.getElementById('readerQuestionCard');
+    questionCard.style.display = 'none';
+    
+    readerView.insertBefore(pickerDiv, document.getElementById('drawCardBtn').parentNode);
+    
+    // Hide draw button during selection
+    btn.classList.add('hidden');
+}
+
+async function selectCard(questionId, questionText, roomId) {
+    try {
+        console.log('Selected card:', questionId, questionText);
+        
+        // Remove picker
+        const picker = document.getElementById('cardPicker');
+        if (picker) picker.remove();
+        
+        // Show the selected question
+        const questionCard = document.getElementById('readerQuestionCard');
+        questionCard.style.display = 'flex';
+        questionCard.textContent = questionText;
+        
+        // Mark this question as used
+        if (questionId) {
+            const { error: insertError } = await supabaseClient.from('used_questions').insert({
+                room_id: roomId,
+                question_id: questionId,
+                round_number: state.round
+            });
+            
+            if (insertError) {
+                console.error('Error marking question as used:', insertError);
+            }
+        }
+        
+        // Update room with selected question
+        const { error: updateError } = await supabaseClient
+            .from('rooms')
+            .update({ current_question: questionText })
+            .eq('id', roomId);
+        
+        if (updateError) throw updateError;
+        
+        // Show reveal button (will appear when all votes are in)
+        document.getElementById('revealBtn').classList.add('hidden');
+        
+    } catch (error) {
+        console.error('Select card error:', error);
+        showToast('Failed to select card: ' + error.message);
+    }
+}
+
+    async function submitVote(targetId) {
+        if (state.hasVoted) return;
+        
+        const doubleDown = document.getElementById('doubleDownBtn').classList.contains('active');
+        
+        document.querySelectorAll('.vote-option').forEach(el => el.classList.remove('selected'));
+        document.getElementById(`vote-${targetId}`).classList.add('selected');
+        
+        try {
+            const { error } = await supabaseClient
                 .from('votes')
-                .select('*')
+                .insert({
+                    room_id: state.currentUser.room_id,
+                    player_id: state.currentUser.id,
+                    target_id: targetId,
+                    round: state.round,
+                    double_down: doubleDown
+                });
+            
+            if (error) throw error;
+            
+            if (doubleDown) {
+                await supabaseClient
+                    .from('players')
+                    .update({ double_down_used: true })
+                    .eq('id', state.currentUser.id);
+            }
+            
+            state.hasVoted = true;
+            document.getElementById('votingSection').style.display = 'none';
+            document.getElementById('waitingSection').style.display = 'block';
+            document.getElementById('voterStatus').textContent = 'Vote submitted!';
+            
+        } catch (error) {
+            console.error('Submit vote error:', error);
+            showToast('Failed to vote: ' + error.message);
+            state.hasVoted = false;
+        }
+    }
+
+    async function revealVotes() {
+        const btn = document.getElementById('revealBtn');
+        btn.disabled = true;
+        btn.textContent = 'Revealing...';
+        
+        try {
+            const roomId = state.currentUser.room_id;
+            
+            const voteCounts = {};
+            Object.values(state.votes).forEach(v => {
+                voteCounts[v.target] = (voteCounts[v.target] || 0) + 1;
+            });
+            
+            let maxVotes = 0;
+            let majority = null;
+            Object.entries(voteCounts).forEach(([target, count]) => {
+                if (count > maxVotes) {
+                    maxVotes = count;
+                    majority = target;
+                }
+            });
+            
+            const newScores = { ...state.scores };
+            Object.entries(state.votes).forEach(([voterId, vote]) => {
+                if (vote.target === majority) {
+                    const points = vote.doubleDown ? 2 : 1;
+                    newScores[voterId] = (newScores[voterId] || 0) + points;
+                }
+            });
+            
+            const { error } = await supabaseClient
+                .from('rooms')
+                .update({
+                    game_state: 'results',
+                    scores: newScores,
+                    last_majority: majority
+                })
+                .eq('id', roomId);
+            
+            if (error) throw error;
+            
+        } catch (error) {
+            console.error('Reveal votes error:', error);
+            showToast('Failed to reveal: ' + error.message);
+            btn.disabled = false;
+            btn.textContent = 'Reveal Votes';
+        }
+    }
+
+    function showResults() {
+        document.getElementById('readerView').style.display = 'none';
+        document.getElementById('voterView').style.display = 'none';
+        document.getElementById('resultsView').style.display = 'block';
+        
+        document.getElementById('resultQuestion').textContent = state.currentQuestion;
+        
+        const majority = state.players.find(p => {
+            const count = Object.values(state.votes).filter(v => v.target === p.id).length;
+            return count === Math.max(...Object.values(state.votes).map(v => 
+                Object.values(state.votes).filter(v2 => v2.target === v.target).length
+            ));
+        });
+        
+        document.getElementById('majorityTarget').textContent = majority?.name || 'No one';
+        
+        const list = document.getElementById('resultsList');
+        const voters = Object.keys(state.votes);
+        
+        list.innerHTML = voters.map(voterId => {
+            const voter = state.players.find(p => p.id === voterId);
+            const vote = state.votes[voterId];
+            const target = state.players.find(p => p.id === vote.target);
+            const correct = vote.target === majority?.id;
+            const points = correct ? (vote.doubleDown ? 2 : 1) : 0;
+            
+            return `
+                <div class="result-item ${correct ? 'correct' : 'wrong'}">
+                    <div>
+                        <div class="voter-name">${voter?.name || 'Unknown'}</div>
+                        <div class="voted-for">voted for ${target?.name || 'Unknown'}</div>
+                        ${vote.doubleDown ? '<div style="color: #f5576c; font-size: 0.75rem; margin-top: 2px;">🚀 Double Down</div>' : ''}
+                    </div>
+                    <div class="points-earned">${correct ? '+' + points : '0'}</div>
+                </div>
+            `;
+        }).join('');
+        
+        updateScoreboard();
+    }
+
+    function acknowledgeResults() {
+        if (state.isHost) {
+            document.getElementById('continueBtn').textContent = 'Starting next round...';
+            nextRound();
+        } else {
+            document.getElementById('continueBtn').textContent = 'Waiting for host...';
+            document.getElementById('continueBtn').disabled = true;
+        }
+    }
+
+    // ==========================================
+    // FIXED NEXT ROUND - CYCLES READERS
+    // ==========================================
+    async function nextRound() {
+        try {
+            const roomId = state.currentUser.room_id;
+            
+            // Find current reader index and pick next player in circle
+            const currentIdx = state.players.findIndex(p => p.id === state.currentReader);
+            const nextIdx = (currentIdx + 1) % state.players.length;
+            const nextReader = state.players[nextIdx]?.id;
+            
+            console.log('Current reader index:', currentIdx, 'Next reader index:', nextIdx);
+            
+            const { error } = await supabaseClient
+                .from('rooms')
+                .update({
+                    game_state: 'playing',
+                    current_question: null,
+                    current_reader: nextReader,
+                    current_round: state.round + 1,
+                    last_majority: null
+                })
+                .eq('id', roomId);
+            
+            await supabaseClient
+                .from('votes')
+                .delete()
                 .eq('room_id', roomId)
                 .eq('round', state.round);
             
-            if (error) {
-                console.error('Load votes error:', error);
-                return;
-            }
+            if (error) throw error;
             
-            state.votes = {};
-            votes.forEach(v => {
-                state.votes[v.player_id] = {
-                    target: v.target_id,
-                    doubleDown: v.double_down
-                };
-            });
+            document.getElementById('continueBtn').textContent = 'Continue';
+            document.getElementById('continueBtn').disabled = false;
             
-            updateVotingStatus();
+        } catch (error) {
+            console.error('Next round error:', error);
+            showToast('Failed to advance: ' + error.message);
         }
+    }
 
-        function handleRoomChange(room) {
-            if (!room) return;
-            
-            state.gameState = room.game_state;
-            state.currentQuestion = room.current_question;
-            state.currentReader = room.current_reader;
-            state.round = room.current_round;
-            
-            if (room.scores) {
-                state.scores = room.scores;
-            }
-            
-            if (state.gameState === 'playing' || state.gameState === 'results') {
-                if (document.getElementById('lobbyScreen').classList.contains('active')) {
-                    showScreen('gameScreen');
-                }
-                updateGameView();
-            }
-            
-            if (state.scores && Object.entries(state.scores).length > 0) {
-                const winner = Object.entries(state.scores).find(([id, score]) => score >= CONFIG.POINTS_TO_WIN);
-                if (winner && !document.getElementById('winnerScreen').classList.contains('active')) {
-                    showWinner(winner[0]);
-                }
-            }
-        }
-
-        // ==========================================
-        // GAME LOGIC
-        // ==========================================
-        function updateLobby() {
-            document.getElementById('playerCount').textContent = state.players.length;
-            
-            const grid = document.getElementById('lobbyPlayers');
-            if (state.players.length === 0) {
-                grid.innerHTML = '<div class="empty-state" style="grid-column: 1/-1;"><div class="empty-state-icon">👥</div><p>No players yet</p></div>';
-            } else {
-                grid.innerHTML = state.players.map(p => `
-                    <div class="player-card ${p.id === state.currentUser?.id ? 'current-user' : ''}">
-                        <div class="player-avatar">${p.name.charAt(0).toUpperCase()}</div>
-                        <div class="player-name">${p.name}</div>
-                        <div class="player-status">${p.is_host ? '👑 Host' : 'Player'}</div>
-                    </div>
-                `).join('');
-            }
-            
-            if (state.isHost) {
-                const canStart = state.players.length >= CONFIG.MIN_PLAYERS;
-                const startBtn = document.getElementById('startBtn');
-                const status = document.getElementById('startStatus');
-                
-                startBtn.disabled = !canStart;
-                if (canStart) {
-                    status.textContent = `Ready to start! (${state.players.length} players)`;
-                    status.classList.add('active');
-                } else {
-                    status.textContent = `Need ${CONFIG.MIN_PLAYERS - state.players.length} more player(s)`;
-                    status.classList.remove('active');
-                }
-            }
-        }
-
-        async function startGame() {
-            if (!state.isHost) return;
-            
-            const btn = document.getElementById('startBtn');
-            btn.disabled = true;
-            btn.textContent = 'Starting...';
-            
-            try {
-                const roomId = state.currentUser.room_id;
-                
-                const scores = {};
-                state.players.forEach(p => scores[p.id] = 0);
-                
-                const { error } = await supabaseClient
-                    .from('rooms')
-                    .update({
-                        game_state: 'playing',
-                        current_reader: state.players[0]?.id,
-                        scores: scores,
-                        started_at: new Date().toISOString()
-                    })
-                    .eq('id', roomId);
-                
-                if (error) throw error;
-                
-                showScreen('gameScreen');
-                initGameView();
-                
-            } catch (error) {
-                console.error('Start game error:', error);
-                showToast('Failed to start: ' + error.message);
-                btn.disabled = false;
-                btn.textContent = 'Start Game';
-            }
-        }
-
-        function initGameView() {
-            updateScoreboard();
-            
-            const isReader = state.currentReader === state.currentUser?.id;
-            
-            document.getElementById('readerView').style.display = isReader ? 'block' : 'none';
-            document.getElementById('voterView').style.display = isReader ? 'none' : 'block';
-            document.getElementById('resultsView').style.display = 'none';
-            
-            if (isReader) {
-                document.getElementById('readerQuestionCard').textContent = 'Tap "Draw Card" when everyone is ready';
-                document.getElementById('drawCardBtn').classList.remove('hidden');
-                document.getElementById('revealBtn').classList.add('hidden');
-                document.getElementById('nextRoundBtn').classList.add('hidden');
-                updateVotingStatus();
-            } else {
-                document.getElementById('voterQuestionCard').textContent = 'The reader is drawing a card...';
-                document.getElementById('voterQuestionCard').classList.add('waiting');
-                document.getElementById('voterStatus').textContent = 'Waiting for question...';
-                document.getElementById('voterStatus').classList.remove('active');
-                document.getElementById('doubleDownSection').style.display = 'none';
-                document.getElementById('votingSection').style.display = 'none';
-                document.getElementById('waitingSection').style.display = 'none';
-            }
-            
-            state.hasVoted = false;
-        }
-
-        function updateScoreboard() {
-            const board = document.getElementById('scoreboard');
-            const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
-            const maxScore = sorted.length > 0 ? sorted[0][1] : 0;
-            
-            board.innerHTML = sorted.map(([playerId, score]) => {
-                const player = state.players.find(p => p.id === playerId);
-                if (!player) return '';
-                return `
-                    <div class="score-item ${score === maxScore && score > 0 ? 'leading' : ''}">
-                        <div class="score-value">${score}</div>
-                        <div class="score-name">${player.name}</div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function updateGameView() {
-            updateScoreboard();
-            
-            const isReader = state.currentReader === state.currentUser?.id;
-            
-            if (state.currentQuestion) {
-                if (isReader) {
-                    document.getElementById('readerQuestionCard').textContent = state.currentQuestion;
-                    document.getElementById('drawCardBtn').classList.add('hidden');
-                    
-                    const voters = state.players.filter(p => p.id !== state.currentReader);
-                    const allVoted = voters.every(p => state.votes[p.id]);
-                    
-                    const revealBtn = document.getElementById('revealBtn');
-                    if (allVoted && revealBtn.classList.contains('hidden')) {
-                        revealBtn.classList.remove('hidden');
-                        showToast('Everyone voted!');
-                    }
-                    
-                    updateVotingStatus();
-                } else if (!state.hasVoted) {
-                    document.getElementById('voterQuestionCard').textContent = state.currentQuestion;
-                    document.getElementById('voterQuestionCard').classList.remove('waiting');
-                    document.getElementById('voterStatus').textContent = 'Vote now!';
-                    document.getElementById('voterStatus').classList.add('active');
-                    document.getElementById('doubleDownSection').style.display = 'block';
-                    document.getElementById('votingSection').style.display = 'block';
-                    
-                    const ddBtn = document.getElementById('doubleDownBtn');
-                    if (state.currentUser?.double_down_used) {
-                        ddBtn.classList.add('used');
-                        ddBtn.disabled = true;
-                    } else {
-                        ddBtn.classList.remove('used', 'active');
-                        ddBtn.disabled = false;
-                    }
-                    
-                    updateVoteOptions();
-                }
-            }
-            
-            if (state.gameState === 'results') {
-                showResults();
-            }
-        }
-
-        function updateVotingStatus() {
-            const container = document.getElementById('votingStatus');
-            const voters = state.players.filter(p => p.id !== state.currentReader);
-            
-            container.innerHTML = voters.map(p => {
-                const hasVoted = state.votes[p.id];
-                return `
-                    <div class="player-card ${hasVoted ? 'voted' : ''}" style="padding: 8px;">
-                        <div class="player-avatar" style="width: 35px; height: 35px; font-size: 1rem;">${p.name.charAt(0)}</div>
-                        <div style="font-size: 0.7rem;">${hasVoted ? '✓' : '...'}</div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function updateVoteOptions() {
-            const container = document.getElementById('voteOptions');
-            const options = state.players.filter(p => p.id !== state.currentUser?.id);
-            
-            container.innerHTML = options.map(p => `
-                <div class="vote-option" onclick="submitVote('${p.id}')" id="vote-${p.id}">
-                    <div style="font-size: 1.5rem; margin-bottom: 5px;">${p.name.charAt(0)}</div>
-                    <div style="font-weight: 600;">${p.name}</div>
+    function showWinner(winnerId) {
+        showScreen('winnerScreen');
+        
+        const winner = state.players.find(p => p.id === winnerId);
+        document.getElementById('winnerName').textContent = winner?.name || 'Unknown';
+        
+        const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
+        
+        document.getElementById('finalStandings').innerHTML = sorted.map(([id, score], i) => {
+            const player = state.players.find(p => p.id === id);
+            return `
+                <div class="standing-item">
+                    <div class="standing-rank">#${i + 1}</div>
+                    <div class="standing-name">${player?.name || 'Unknown'}</div>
+                    <div class="standing-score">${score} pts</div>
                 </div>
-            `).join('');
-        }
+            `;
+        }).join('');
+    }
 
-        function toggleDoubleDown() {
-            const btn = document.getElementById('doubleDownBtn');
-            btn.classList.toggle('active');
+    async function leaveRoom() {
+        if (realtimeChannel) {
+            supabaseClient.removeChannel(realtimeChannel);
+            realtimeChannel = null;
         }
-
-        async function drawCard() {
-            const btn = document.getElementById('drawCardBtn');
-            btn.disabled = true;
-            btn.textContent = 'Drawing...';
-            
-            try {
-                const roomId = state.currentUser.room_id;
+        
+        try {
+            if (state.currentUser) {
+                await supabaseClient.from('players').delete().eq('id', state.currentUser.id);
                 
-                // Get questions not yet used in this session
-                const { data: usedQs, error: usedError } = await supabaseClient
-                    .from('used_questions')
-                    .select('question_id')
-                    .eq('room_id', roomId);
-                
-                if (usedError) throw usedError;
-                
-                const usedIds = usedQs?.map(uq => uq.question_id) || [];
-                
-                let query = supabaseClient.from('questions').select('*');
-                
-                // If there are used questions, exclude them
-                if (usedIds.length > 0) {
-                    query = query.not('id', 'in', `(${usedIds.join(',')})`);
+                if (state.isHost && state.currentUser.room_id) {
+                    await supabaseClient.from('rooms').delete().eq('id', state.currentUser.room_id);
                 }
-                
-                const { data: availableQuestions, error: qError } = await query;
-                
-                let selectedQuestion;
-                
-                if (!availableQuestions || availableQuestions.length === 0) {
-                    // All questions used - reset for this room
-                    await supabaseClient
-                        .from('used_questions')
-                        .delete()
-                        .eq('room_id', roomId);
-                    
-                    // Get all questions fresh
-                    const { data: allQuestions, error: allError } = await supabaseClient
-                        .from('questions')
-                        .select('*');
-                    
-                    if (allError) throw allError;
-                    
-                    selectedQuestion = allQuestions[Math.floor(Math.random() * allQuestions.length)];
-                } else {
-                    selectedQuestion = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
-                }
-                
-                // Mark question as used
-                const { error: insertError } = await supabaseClient.from('used_questions').insert({
-                    room_id: roomId,
-                    question_id: selectedQuestion.id,
-                    round_number: state.round
-                });
-                
-                if (insertError) throw insertError;
-                
-                // Update room with current question
-                const { error: updateError } = await supabaseClient
-                    .from('rooms')
-                    .update({ current_question: selectedQuestion.question_text })
-                    .eq('id', roomId);
-                
-                if (updateError) throw updateError;
-                
-                document.getElementById('readerQuestionCard').textContent = selectedQuestion.question_text;
-                btn.classList.add('hidden');
-                
-            } catch (error) {
-                console.error('Draw card error:', error);
-                showToast('Failed to draw card: ' + error.message);
-                btn.disabled = false;
-                btn.textContent = 'Draw Card';
             }
+        } catch (e) {
+            console.error('Error leaving:', e);
         }
+        
+        state.currentUser = null;
+        state.roomCode = null;
+        state.isHost = false;
+        state.players = [];
+        state.gameState = 'waiting';
+        state.doubleDownUsed = false;
+        state.hasVoted = false;
+        state.scores = {};
+        
+        showScreen('joinScreen');
+        document.getElementById('usernameInput').value = '';
+        document.getElementById('roomCodeInput').value = '';
+    }
 
-        async function submitVote(targetId) {
-            if (state.hasVoted) return;
-            
-            const doubleDown = document.getElementById('doubleDownBtn').classList.contains('active');
-            
-            document.querySelectorAll('.vote-option').forEach(el => el.classList.remove('selected'));
-            document.getElementById(`vote-${targetId}`).classList.add('selected');
-            
-            try {
-                const { error } = await supabaseClient
-                    .from('votes')
-                    .insert({
-                        room_id: state.currentUser.room_id,
-                        player_id: state.currentUser.id,
-                        target_id: targetId,
-                        round: state.round,
-                        double_down: doubleDown
-                    });
-                
-                if (error) throw error;
-                
-                if (doubleDown) {
-                    await supabaseClient
-                        .from('players')
-                        .update({ double_down_used: true })
-                        .eq('id', state.currentUser.id);
-                }
-                
-                state.hasVoted = true;
-                document.getElementById('votingSection').style.display = 'none';
-                document.getElementById('waitingSection').style.display = 'block';
-                document.getElementById('voterStatus').textContent = 'Vote submitted!';
-                
-            } catch (error) {
-                console.error('Submit vote error:', error);
-                showToast('Failed to vote: ' + error.message);
-                state.hasVoted = false;
-            }
+    function playAgain() {
+        showScreen('lobbyScreen');
+        state.gameState = 'waiting';
+        state.doubleDownUsed = false;
+        state.scores = {};
+        
+        if (state.currentUser?.room_id) {
+            loadPlayers(state.currentUser.room_id);
         }
+    }
 
-        async function revealVotes() {
-            const btn = document.getElementById('revealBtn');
-            btn.disabled = true;
-            btn.textContent = 'Revealing...';
-            
-            try {
-                const roomId = state.currentUser.room_id;
-                
-                const voteCounts = {};
-                Object.values(state.votes).forEach(v => {
-                    voteCounts[v.target] = (voteCounts[v.target] || 0) + 1;
-                });
-                
-                let maxVotes = 0;
-                let majority = null;
-                Object.entries(voteCounts).forEach(([target, count]) => {
-                    if (count > maxVotes) {
-                        maxVotes = count;
-                        majority = target;
-                    }
-                });
-                
-                const newScores = { ...state.scores };
-                Object.entries(state.votes).forEach(([voterId, vote]) => {
-                    if (vote.target === majority) {
-                        const points = vote.doubleDown ? 2 : 1;
-                        newScores[voterId] = (newScores[voterId] || 0) + points;
-                    }
-                });
-                
-                const { error } = await supabaseClient
-                    .from('rooms')
-                    .update({
-                        game_state: 'results',
-                        scores: newScores,
-                        last_majority: majority
-                    })
-                    .eq('id', roomId);
-                
-                if (error) throw error;
-                
-            } catch (error) {
-                console.error('Reveal votes error:', error);
-                showToast('Failed to reveal: ' + error.message);
-                btn.disabled = false;
-                btn.textContent = 'Reveal Votes';
-            }
+    function copyRoomCode() {
+        const code = document.getElementById('displayRoomCode').textContent;
+        navigator.clipboard.writeText(code).then(() => {
+            showToast('Room code copied!');
+        });
+    }
+
+    // ==========================================
+    // UTILITY FUNCTIONS
+    // ==========================================
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
+
+    function showToast(message, duration = 3000) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), duration);
+    }
+
+    function showError(elementId, message) {
+        const el = document.getElementById(elementId);
+        el.textContent = message;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 5000);
+    }
+
+    function updateConnectionStatus(connected) {
+        const el = document.getElementById('connectionStatus');
+        el.classList.remove('online', 'offline', 'connecting');
+        
+        if (connected === true) {
+            el.classList.add('online');
+            el.innerHTML = '<div class="pulse-dot"></div><span>Live</span>';
+        } else {
+            el.classList.add('offline');
+            el.innerHTML = '<div class="pulse-dot"></div><span>Offline</span>';
         }
+    }
 
-        function showResults() {
-            document.getElementById('readerView').style.display = 'none';
-            document.getElementById('voterView').style.display = 'none';
-            document.getElementById('resultsView').style.display = 'block';
-            
-            document.getElementById('resultQuestion').textContent = state.currentQuestion;
-            
-            const majority = state.players.find(p => {
-                const count = Object.values(state.votes).filter(v => v.target === p.id).length;
-                return count === Math.max(...Object.values(state.votes).map(v => 
-                    Object.values(state.votes).filter(v2 => v2.target === v.target).length
-                ));
-            });
-            
-            document.getElementById('majorityTarget').textContent = majority?.name || 'No one';
-            
-            const list = document.getElementById('resultsList');
-            const voters = Object.keys(state.votes);
-            
-            list.innerHTML = voters.map(voterId => {
-                const voter = state.players.find(p => p.id === voterId);
-                const vote = state.votes[voterId];
-                const target = state.players.find(p => p.id === vote.target);
-                const correct = vote.target === majority?.id;
-                const points = correct ? (vote.doubleDown ? 2 : 1) : 0;
-                
-                return `
-                    <div class="result-item ${correct ? 'correct' : 'wrong'}">
-                        <div>
-                            <div class="voter-name">${voter?.name || 'Unknown'}</div>
-                            <div class="voted-for">voted for ${target?.name || 'Unknown'}</div>
-                            ${vote.doubleDown ? '<div style="color: #f5576c; font-size: 0.75rem; margin-top: 2px;">🚀 Double Down</div>' : ''}
-                        </div>
-                        <div class="points-earned">${correct ? '+' + points : '0'}</div>
-                    </div>
-                `;
-            }).join('');
-            
-            updateScoreboard();
+    // Prevent zoom on double tap
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if (now - lastTouchEnd <= 300) {
+            e.preventDefault();
         }
-
-        function acknowledgeResults() {
-            if (state.isHost) {
-                document.getElementById('continueBtn').textContent = 'Starting next round...';
-                nextRound();
-            } else {
-                document.getElementById('continueBtn').textContent = 'Waiting for host...';
-                document.getElementById('continueBtn').disabled = true;
-            }
-        }
-
-        async function nextRound() {
-            try {
-                const roomId = state.currentUser.room_id;
-                const currentIdx = state.players.findIndex(p => p.id === state.currentReader);
-                const nextReader = state.players[(currentIdx + 1) % state.players.length]?.id;
-                
-                const { error } = await supabaseClient
-                    .from('rooms')
-                    .update({
-                        game_state: 'playing',
-                        current_question: null,
-                        current_reader: nextReader,
-                        current_round: state.round + 1,
-                        last_majority: null
-                    })
-                    .eq('id', roomId);
-                
-                await supabaseClient
-                    .from('votes')
-                    .delete()
-                    .eq('room_id', roomId)
-                    .eq('round', state.round);
-                
-                if (error) throw error;
-                
-                document.getElementById('continueBtn').textContent = 'Continue';
-                document.getElementById('continueBtn').disabled = false;
-                
-            } catch (error) {
-                console.error('Next round error:', error);
-                showToast('Failed to advance: ' + error.message);
-            }
-        }
-
-        function showWinner(winnerId) {
-            showScreen('winnerScreen');
-            
-            const winner = state.players.find(p => p.id === winnerId);
-            document.getElementById('winnerName').textContent = winner?.name || 'Unknown';
-            
-            const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
-            
-            document.getElementById('finalStandings').innerHTML = sorted.map(([id, score], i) => {
-                const player = state.players.find(p => p.id === id);
-                return `
-                    <div class="standing-item">
-                        <div class="standing-rank">#${i + 1}</div>
-                        <div class="standing-name">${player?.name || 'Unknown'}</div>
-                        <div class="standing-score">${score} pts</div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        async function leaveRoom() {
-            if (realtimeChannel) {
-                supabaseClient.removeChannel(realtimeChannel);
-                realtimeChannel = null;
-            }
-            
-            try {
-                if (state.currentUser) {
-                    await supabaseClient.from('players').delete().eq('id', state.currentUser.id);
-                    
-                    if (state.isHost && state.currentUser.room_id) {
-                        await supabaseClient.from('rooms').delete().eq('id', state.currentUser.room_id);
-                    }
-                }
-            } catch (e) {
-                console.error('Error leaving:', e);
-            }
-            
-            state.currentUser = null;
-            state.roomCode = null;
-            state.isHost = false;
-            state.players = [];
-            state.gameState = 'waiting';
-            state.doubleDownUsed = false;
-            state.hasVoted = false;
-            state.scores = {};
-            
-            showScreen('joinScreen');
-            document.getElementById('usernameInput').value = '';
-            document.getElementById('roomCodeInput').value = '';
-        }
-
-        function playAgain() {
-            showScreen('lobbyScreen');
-            state.gameState = 'waiting';
-            state.doubleDownUsed = false;
-            state.scores = {};
-            
-            if (state.currentUser?.room_id) {
-                loadPlayers(state.currentUser.room_id);
-            }
-        }
-
-        function copyRoomCode() {
-            const code = document.getElementById('displayRoomCode').textContent;
-            navigator.clipboard.writeText(code).then(() => {
-                showToast('Room code copied!');
-            });
-        }
-
-        // ==========================================
-        // UTILITY FUNCTIONS
-        // ==========================================
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
-        }
-
-        function showToast(message, duration = 3000) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), duration);
-        }
-
-        function showError(elementId, message) {
-            const el = document.getElementById(elementId);
-            el.textContent = message;
-            el.classList.add('show');
-            setTimeout(() => el.classList.remove('show'), 5000);
-        }
-
-        function updateConnectionStatus(connected) {
-            const el = document.getElementById('connectionStatus');
-            el.classList.remove('online', 'offline', 'connecting');
-            
-            if (connected === true) {
-                el.classList.add('online');
-                el.innerHTML = '<div class="pulse-dot"></div><span>Live</span>';
-            } else {
-                el.classList.add('offline');
-                el.innerHTML = '<div class="pulse-dot"></div><span>Offline</span>';
-            }
-        }
-
-        // Prevent zoom on double tap
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', (e) => {
-            const now = Date.now();
-            if (now - lastTouchEnd <= 300) {
-                e.preventDefault();
-            }
-            lastTouchEnd = now;
-        }, false);
-    </script>
+        lastTouchEnd = now;
+    }, false);
+</script>
 </body>
 </html>
