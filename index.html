@@ -1688,7 +1688,7 @@ async function drawCard() {
     }
 }
 
-function showCardPicker(cards, roomId) {
+    function showCardPicker(cards, roomId) {
     console.log('=== SHOW CARD PICKER ===');
     console.log('Cards to display:', cards.length);
     
@@ -1703,105 +1703,187 @@ function showCardPicker(cards, roomId) {
     // Remove existing picker
     const existingPicker = document.getElementById('cardPicker');
     if (existingPicker) {
-        console.log('Removing existing picker');
         existingPicker.remove();
     }
     
-    // Create card picker HTML
+    // Add flip animation styles if not already added
+    if (!document.getElementById('flipStyles')) {
+        const style = document.createElement('style');
+        style.id = 'flipStyles';
+        style.textContent = `
+            .card-container {
+                perspective: 1000px;
+                width: 140px;
+                height: 200px;
+            }
+            .card-inner {
+                position: relative;
+                width: 100%;
+                height: 100%;
+                text-align: center;
+                transition: transform 0.6s;
+                transform-style: preserve-3d;
+                cursor: pointer;
+            }
+            .card-container.flipped .card-inner {
+                transform: rotateY(180deg);
+            }
+            .card-front, .card-back {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                -webkit-backface-visibility: hidden;
+                backface-visibility: hidden;
+                border-radius: 15px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                border: 3px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+                overflow: hidden;
+            }
+            .card-front {
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                color: white;
+            }
+            .card-back {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                transform: rotateY(180deg);
+                padding: 15px;
+            }
+            .card-container:hover .card-inner {
+                transform: rotateY(10deg);
+            }
+            .card-container.flipped:hover .card-inner {
+                transform: rotateY(180deg);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Create card picker HTML with flip animation
     let cardsHTML = '';
     cards.forEach((card, index) => {
-        console.log(`Building card ${index + 1}:`, card.category);
         const safeText = (card.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         const safeCategory = (card.category || 'Question').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         const safeId = (card.id || '').replace(/'/g, "\\'");
         
         cardsHTML += `
-            <div class="playing-card" onclick="selectCard('${safeId}', '${safeText}', '${safeCategory}', '${roomId}')" 
-                 style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-                        border-radius: 15px;
-                        padding: 15px;
-                        width: 140px;
-                        height: 200px;
-                        cursor: pointer;
-                        transition: all 0.3s ease;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        justify-content: center;
-                        border: 3px solid rgba(255, 255, 255, 0.2);
-                        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-                        position: relative;
-                        overflow: hidden;
-                        margin: 5px;"
-                 onmouseover="this.style.transform='translateY(-10px) scale(1.02)'; this.style.boxShadow='0 15px 35px rgba(102, 126, 234, 0.4)'; this.style.borderColor='rgba(254, 202, 87, 0.6)';"
-                 onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 8px 20px rgba(0, 0, 0, 0.3)'; this.style.borderColor='rgba(255, 255, 255, 0.2)';">
-                
-                <div style="position: absolute; top: 8px; left: 8px; font-size: 1.2rem;">🃏</div>
-                <div style="position: absolute; top: 8px; right: 8px; font-size: 1.2rem;">🃏</div>
-                
-                <div style="text-align: center; z-index: 1; width: 100%;">
-                    <div style="font-size: 2.5rem; margin-bottom: 10px;">❓</div>
-                    <div style="color: #feca57; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-weight: 600;">Category</div>
-                    <div style="color: #fff; font-size: 0.85rem; font-weight: bold; line-height: 1.2; padding: 0 5px; text-align: center; max-height: 80px; overflow: hidden;">
-                        ${card.category || 'Random'}
+            <div class="card-container" id="card-${index}" onclick="flipAndSelectCard(${index}, '${safeId}', '${safeText}', '${safeCategory}', '${roomId')">
+                <div class="card-inner">
+                    <!-- Front of card (shows category) -->
+                    <div class="card-front">
+                        <div style="position: absolute; top: 8px; left: 8px; font-size: 1.2rem;">🃏</div>
+                        <div style="position: absolute; top: 8px; right: 8px; font-size: 1.2rem;">🃏</div>
+                        
+                        <div style="text-align: center; z-index: 1; width: 100%;">
+                            <div style="font-size: 2.5rem; margin-bottom: 10px;">❓</div>
+                            <div style="color: #feca57; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-weight: 600;">Category</div>
+                            <div style="color: #fff; font-size: 0.85rem; font-weight: bold; line-height: 1.2; padding: 0 10px; text-align: center;">
+                                ${card.category || 'Random'}
+                            </div>
+                        </div>
+                        
+                        <div style="position: absolute; bottom: 8px; right: 8px; font-size: 1.2rem; transform: rotate(180deg);">🃏</div>
+                        <div style="position: absolute; bottom: 8px; left: 8px; font-size: 1.2rem; transform: rotate(180deg);">🃏</div>
+                        <div style="position: absolute; bottom: 35px; color: rgba(255,255,255,0.4); font-size: 0.7rem; letter-spacing: 1px;">CARD ${index + 1}</div>
+                    </div>
+                    
+                    <!-- Back of card (shows question preview) -->
+                    <div class="card-back">
+                        <div style="font-size: 1.5rem; margin-bottom: 10px;">👁️</div>
+                        <div style="font-size: 0.8rem; font-weight: bold; line-height: 1.3;">
+                            ${card.text.substring(0, 60)}${card.text.length > 60 ? '...' : ''}
+                        </div>
+                        <div style="margin-top: 15px; font-size: 0.7rem; color: #feca57; text-transform: uppercase;">
+                            Tap to use this card
+                        </div>
                     </div>
                 </div>
-                
-                <div style="position: absolute; bottom: 8px; right: 8px; font-size: 1.2rem; transform: rotate(180deg);">🃏</div>
-                <div style="position: absolute; bottom: 8px; left: 8px; font-size: 1.2rem; transform: rotate(180deg);">🃏</div>
-                
-                <div style="position: absolute; bottom: 35px; color: rgba(255,255,255,0.4); font-size: 0.7rem; letter-spacing: 1px;">CARD ${index + 1}</div>
             </div>
         `;
     });
     
     const pickerHTML = `
         <div id="cardPicker" style="text-align: center; margin-bottom: 20px; animation: fadeIn 0.3s ease;">
-            <h3 style="color: #feca57; margin-bottom: 15px;">Pick a Question</h3>
-            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
+            <h3 style="color: #feca57; margin-bottom: 15px;">🎴 Pick a Question</h3>
+            <p style="color: #a0a0a0; font-size: 0.85rem; margin-bottom: 15px;">Hover to peek • Click to flip & select</p>
+            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px; perspective: 1000px;">
                 ${cardsHTML}
             </div>
-            <p style="color: #a0a0a0; font-size: 0.85rem; margin-top: 10px;">Tap a card to reveal the question</p>
         </div>
     `;
     
     // Insert picker before the action buttons
     const actionButtons = document.getElementById('drawCardBtn').parentNode;
-    
-    // Create a container div
     const pickerDiv = document.createElement('div');
     pickerDiv.innerHTML = pickerHTML;
-    
     readerView.insertBefore(pickerDiv.firstElementChild, actionButtons);
     
     // Hide draw button and question card
     document.getElementById('readerQuestionCard').style.display = 'none';
     btn.classList.add('hidden');
     
-    console.log('Card picker inserted successfully');
+    console.log('Card picker inserted with 3D flip animation');
+}
+
+// New function to handle flip + select
+async function flipAndSelectCard(index, questionId, questionText, category, roomId) {
+    const cardContainer = document.getElementById(`card-${index}`);
+    
+    // If already flipped, select it
+    if (cardContainer.classList.contains('flipped')) {
+        await selectCard(questionId, questionText, category, roomId);
+        return;
+    }
+    
+    // Flip all other cards back first
+    document.querySelectorAll('.card-container').forEach((card, i) => {
+        if (i !== index) {
+            card.classList.remove('flipped');
+        }
+    });
+    
+    // Flip this card
+    cardContainer.classList.add('flipped');
+    
+    // Add "Select" hint
+    setTimeout(() => {
+        if (cardContainer.classList.contains('flipped')) {
+            // Keep it flipped, user can click again to select
+        }
+    }, 600);
 }
 
 async function selectCard(questionId, questionText, category, roomId) {
     console.log('=== SELECT CARD ===', {questionId, category, roomId});
     
     try {
-        // Remove picker
+        // Animate picker away
         const picker = document.getElementById('cardPicker');
         if (picker) {
-            picker.style.transition = 'opacity 0.3s ease';
+            picker.style.transition = 'all 0.5s ease';
+            picker.style.transform = 'scale(0.8) translateY(-50px)';
             picker.style.opacity = '0';
-            setTimeout(() => picker.remove(), 300);
+            setTimeout(() => picker.remove(), 500);
         }
         
-        // Show the selected question
+        // Show the selected question with fancy reveal
         const questionCard = document.getElementById('readerQuestionCard');
         questionCard.style.display = 'flex';
         questionCard.style.flexDirection = 'column';
+        questionCard.style.animation = 'none';
+        questionCard.offsetHeight; // Trigger reflow
+        questionCard.style.animation = 'fadeIn 0.5s ease';
+        
         questionCard.innerHTML = `
-            <div style="font-size: 0.75rem; color: #feca57; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; font-weight: 600;">
-                📁 ${category || 'Question'}
+            <div style="font-size: 0.75rem; color: #feca57; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                <span>🎴</span>
+                <span>${category || 'Question'}</span>
             </div>
-            <div style="font-size: 1.2rem;">${questionText}</div>
+            <div style="font-size: 1.3rem; font-weight: 600; line-height: 1.4;">${questionText}</div>
         `;
         
         // Mark this question as used
@@ -1826,7 +1908,7 @@ async function selectCard(questionId, questionText, category, roomId) {
         
         if (updateError) throw updateError;
         
-        showToast('Question revealed! Waiting for votes...');
+        showToast('📢 Read the question aloud! Waiting for votes...');
         
     } catch (error) {
         console.error('=== SELECT CARD ERROR ===', error);
