@@ -956,7 +956,8 @@
     </div>
 
     <div id="toast" class="toast"></div>
-<script>
+
+    <script>
     // ==========================================
     // CONFIGURATION
     // ==========================================
@@ -1081,7 +1082,7 @@
     }
 
     // ==========================================
-    // ADMIN FUNCTIONS (simplified)
+    // ADMIN FUNCTIONS
     // ==========================================
     function showAdminLogin() { showScreen('adminLoginScreen'); }
     
@@ -1256,33 +1257,69 @@
         subscribeToRoom(roomId);
     }
 
+    // ==========================================
+    // FIXED REALTIME SUBSCRIPTION
+    // ==========================================
     function subscribeToRoom(roomId) {
+        console.log('Subscribing to room:', roomId);
+        
+        // First, immediately load players to ensure we have data
+        loadPlayers(roomId);
+        
         realtimeChannel = supabaseClient
             .channel('room:' + roomId)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId }, (payload) => handleRoomChange(payload.new))
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: 'room_id=eq.' + roomId }, () => loadPlayers(roomId))
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'votes', filter: 'room_id=eq.' + roomId }, () => loadVotes(roomId))
+            .on('postgres_changes', 
+                { event: '*', schema: 'public', table: 'rooms' },
+                (payload) => {
+                    console.log('Room change received:', payload);
+                    // Only handle if it's our room
+                    if (payload.new && payload.new.id === roomId) {
+                        handleRoomChange(payload.new);
+                    }
+                }
+            )
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'players' },
+                (payload) => {
+                    console.log('Player change received:', payload);
+                    loadPlayers(roomId);
+                }
+            )
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'votes' },
+                (payload) => {
+                    console.log('Vote change received:', payload);
+                    loadVotes(roomId);
+                }
+            )
             .subscribe((status) => {
+                console.log('Subscription status:', status);
                 if (status === 'SUBSCRIBED') {
                     updateConnectionStatus(true);
+                    // Reload players to ensure we have latest data
                     loadPlayers(roomId);
                 }
             });
     }
 
     async function loadPlayers(roomId) {
+        console.log('Loading players for room:', roomId);
         const { data: players, error } = await supabaseClient
             .from('players')
             .select('*')
             .eq('room_id', roomId)
             .order('joined_at', { ascending: true });
         
-        if (error) return;
+        if (error) {
+            console.error('Load players error:', error);
+            return;
+        }
         
-        state.players = players;
+        console.log('Loaded players:', players?.length || 0, players?.map(p => p.name));
+        state.players = players || [];
         updateLobby();
         
-        const updatedMe = players.find(p => p.id === state.currentUser?.id);
+        const updatedMe = players?.find(p => p.id === state.currentUser?.id);
         if (updatedMe) {
             state.currentUser = updatedMe;
             state.isHost = updatedMe.is_host;
@@ -1296,10 +1333,13 @@
             .eq('room_id', roomId)
             .eq('round', state.round);
         
-        if (error) return;
+        if (error) {
+            console.error('Load votes error:', error);
+            return;
+        }
         
         state.votes = {};
-        votes.forEach(v => {
+        votes?.forEach(v => {
             state.votes[v.player_id] = { target: v.target_id, doubleDown: v.double_down };
         });
         
@@ -1309,6 +1349,13 @@
     function handleRoomChange(room) {
         if (!room) return;
         
+        console.log('Handling room change:', { 
+            gameState: room.game_state, 
+            currentReader: room.current_reader,
+            currentQuestion: room.current_question,
+            round: room.current_round
+        });
+        
         state.gameState = room.game_state;
         state.currentQuestion = room.current_question;
         state.currentReader = room.current_reader;
@@ -1316,13 +1363,16 @@
         
         if (room.scores) state.scores = room.scores;
         
+        // If game is playing or results, switch to game screen
         if (state.gameState === 'playing' || state.gameState === 'results') {
             if (document.getElementById('lobbyScreen').classList.contains('active')) {
+                console.log('Switching to game screen');
                 showScreen('gameScreen');
             }
             updateGameView();
         }
         
+        // Check for winner
         if (state.scores && Object.entries(state.scores).length > 0) {
             const winner = Object.entries(state.scores).find(([id, score]) => score >= CONFIG.POINTS_TO_WIN);
             if (winner && !document.getElementById('winnerScreen').classList.contains('active')) {
@@ -1363,8 +1413,25 @@
         }
     }
 
+    // ==========================================
+    // FIXED START GAME - ENSURES PLAYERS LOADED
+    // ==========================================
     async function startGame() {
         if (!state.isHost) return;
+        
+        console.log('Starting game...');
+        console.log('Current players:', state.players.length, state.players.map(p => p.name));
+        
+        // Ensure we have players loaded
+        if (state.players.length === 0) {
+            console.log('No players loaded, reloading...');
+            await loadPlayers(state.currentUser.room_id);
+        }
+        
+        if (state.players.length < CONFIG.MIN_PLAYERS) {
+            showToast(`Need at least ${CONFIG.MIN_PLAYERS} players to start`);
+            return;
+        }
         
         const btn = document.getElementById('startBtn');
         btn.disabled = true;
@@ -1372,19 +1439,33 @@
         
         try {
             const roomId = state.currentUser.room_id;
+            
+            // Pick random starting reader
             const randomIndex = Math.floor(Math.random() * state.players.length);
             const startingReader = state.players[randomIndex]?.id;
+            
+            console.log('Random index:', randomIndex, 'Starting reader:', startingReader, 'Reader name:', state.players[randomIndex]?.name);
             
             const scores = {};
             state.players.forEach(p => scores[p.id] = 0);
             
+            console.log('Updating room with game_state=playing, current_reader=', startingReader);
+            
             const { error } = await supabaseClient
                 .from('rooms')
-                .update({ game_state: 'playing', current_reader: startingReader, scores: scores, started_at: new Date().toISOString() })
+                .update({ 
+                    game_state: 'playing', 
+                    current_reader: startingReader, 
+                    scores: scores, 
+                    started_at: new Date().toISOString() 
+                })
                 .eq('id', roomId);
             
             if (error) throw error;
             
+            console.log('Room updated successfully');
+            
+            // Manually trigger game view update since we might not get realtime event immediately
             showScreen('gameScreen');
             initGameView();
             
@@ -1397,21 +1478,26 @@
     }
 
     function initGameView() {
+        console.log('Initializing game view. Current user:', state.currentUser?.id, 'Current reader:', state.currentReader);
+        
         updateScoreboard();
         
         const isReader = state.currentReader === state.currentUser?.id;
+        console.log('Is current user the reader?', isReader);
         
         document.getElementById('readerView').style.display = isReader ? 'block' : 'none';
         document.getElementById('voterView').style.display = isReader ? 'none' : 'block';
         document.getElementById('resultsView').style.display = 'none';
         
         if (isReader) {
+            console.log('Showing reader view with Draw Card button');
             document.getElementById('readerQuestionCard').textContent = 'Tap "Draw Card" when everyone is ready';
             document.getElementById('drawCardBtn').classList.remove('hidden');
             document.getElementById('revealBtn').classList.add('hidden');
             document.getElementById('nextRoundBtn').classList.add('hidden');
             updateVotingStatus();
         } else {
+            console.log('Showing voter view - waiting for reader');
             document.getElementById('voterQuestionCard').textContent = 'The reader is drawing a card...';
             document.getElementById('voterQuestionCard').classList.add('waiting');
             document.getElementById('voterStatus').textContent = 'Waiting for question...';
@@ -1520,7 +1606,7 @@
     }
 
     // ==========================================
-    // SIMPLIFIED DRAW CARD (NO 3D FLIP FOR NOW)
+    // DRAW CARD - SIMPLIFIED VERSION
     // ==========================================
     async function drawCard() {
         const btn = document.getElementById('drawCardBtn');
@@ -1550,9 +1636,9 @@
             
             // Reset if needed
             if (available.length < 3) {
+                console.log('Resetting used questions...');
                 await supabaseClient.from('used_questions').delete().eq('room_id', roomId);
                 available = CONFIG.QUESTIONS;
-                console.log('Reset, now available:', available.length);
             }
             
             // Draw 3 cards
