@@ -28,6 +28,69 @@
             touch-action: manipulation;
         }
 
+                .rule-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            cursor: pointer;
+            margin-left: 8px;
+            font-size: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .rules-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            padding: 20px;
+        }
+
+        .rules-modal.active {
+            display: flex;
+        }
+
+        .rules-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 20px;
+            padding: 25px;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .rules-content h3 {
+            color: #feca57;
+            margin-bottom: 15px;
+        }
+
+        .rules-content ol {
+            margin-left: 20px;
+            color: #a0a0a0;
+            line-height: 1.8;
+            font-size: 0.9rem;
+        }
+
+        .rules-content li {
+            margin-bottom: 10px;
+        }
+
+        .close-rules {
+            margin-top: 20px;
+            width: 100%;
+        }
+
         .container {
             max-width: 600px;
             margin: 0 auto;
@@ -714,7 +777,9 @@
         <!-- Join Screen -->
         <div id="joinScreen" class="screen">
             <h1>👑 Who's The Worst?</h1>
-            <p class="subtitle">The party game of savage voting</p>
+            <p class="subtitle">The party game of savage voting 
+                <span class="rule-icon" onclick="showRules()">ℹ️</span>
+            </p>
             
             <div class="card">
                 <input type="text" id="usernameInput" placeholder="Your name" maxlength="15" autocomplete="off">
@@ -961,9 +1026,35 @@
         </div>
     </div>
 
+    <div id="rulesModal" class="rules-modal" onclick="hideRules(event)">
+        <div class="rules-content" onclick="event.stopPropagation()">
+            <h3>📋 How to Play</h3>
+            <ol>
+                <li><strong>The Instigator</strong> silently chooses one player and places their vote face down.</li>
+                <li>The Instigator <strong>cannot vote for themselves</strong>.</li>
+                <li>Other players vote by guessing who the Instigator chose, not who they'd personally pick.</li>
+                <li>Reveal votes one-by-one, starting left of Instigator. Instigator reveals last.</li>
+                <li>Players matching the Instigator's vote get <strong>1 point</strong>.</li>
+                <li>If Instigator picked someone no one else chose, the <strong>majority vote</strong> gets 1 point instead. Instigator gets no points.</li>
+                <li><strong>Double Down:</strong> Use once per game. Correct = 2 points, Wrong = lose card (or -2 points if host chooses).</li>
+                <li>Next round: New Instigator goes round-robin.</li>
+            </ol>
+            <button class="btn-secondary close-rules" onclick="hideRules()">Got it</button>
+        </div>
+    </div>
+
     <div id="toast" class="toast"></div>
 
     <script>
+    function showRules() {
+        document.getElementById('rulesModal').classList.add('active');
+    }
+
+    function hideRules(event) {
+        if (!event || event.target.id === 'rulesModal' || event.target.tagName === 'BUTTON') {
+            document.getElementById('rulesModal').classList.remove('active');
+        }
+    }
     // ==========================================
     // CONFIGURATION
     // ==========================================
@@ -2088,6 +2179,6 @@
         lastTouchEnd = now;
     }, false);
 </script>
-    
+        
 </body>
 </html>
