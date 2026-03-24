@@ -1065,7 +1065,7 @@
                 { text: "Who would survive the longest in a zombie apocalypse?", category: "Random" },
                 { text: "Who has the worst taste in romantic partners?", category: "Savage" },
                 { text: "Who would sell their soul for the least amount of money?", category: "Savage" },
-                { text: "Who is most likely to fake their own death?", category: "Random" },
+                { text: "Who would be the most likely to fake their own death?", category: "Random" },
                 { text: "Who would be the worst parent?", category: "Brutal" },
                 { text: "Who has done the most 'walks of shame'?", category: "Embarrassing" },
                 { text: "Who would start a cult and actually succeed?", category: "Random" },
@@ -1146,40 +1146,33 @@
 
         // Room Management
         async function createRoom() {
-    const username = document.getElementById('usernameInput').value.trim();
-    
-    if (!username) {
-        showError('joinError', 'Enter your name first');
-        return;
-    }
-    
-    if (username.length < 2) {
-        showError('joinError', 'Name too short');
-        return;
-    }
-    
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    
-    try {
-        console.log('Creating room with code:', code); // DEBUG
-        
-        const { data: room, error } = await supabase
-            .from('rooms')
-            .insert({
-                code: code,
-                game_state: 'waiting',
-                current_round: 1,
-                created_at: new Date().toISOString()
-            })
-            .select()
-            .single();
-        
-        if (error) {
-            console.error('Supabase error:', error); // DEBUG
-            throw error;
-        }
-        
-        console.log('Room created:', room); // DEBUG
+            const username = document.getElementById('usernameInput').value.trim();
+            
+            if (!username) {
+                showError('joinError', 'Enter your name first');
+                return;
+            }
+            
+            if (username.length < 2) {
+                showError('joinError', 'Name too short');
+                return;
+            }
+            
+            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+            
+            try {
+                const { data: room, error } = await supabase
+                    .from('rooms')
+                    .insert({
+                        code: code,
+                        game_state: 'waiting',
+                        current_round: 1,
+                        created_at: new Date().toISOString()
+                    })
+                    .select()
+                    .single();
+                
+                if (error) throw error;
                 
                 const { data: player, error: playerError } = await supabase
                     .from('players')
@@ -1202,8 +1195,8 @@
                 enterLobby(room.id);
                 
             } catch (error) {
-        console.error('Full error:', error); // DEBUG - Check browser console for this
-        showError('joinError', 'Failed to create room: ' + error.message);
+                console.error('Create room error:', error);
+                showError('joinError', 'Failed to create room: ' + error.message);
             }
         }
 
@@ -1268,6 +1261,7 @@
                 enterLobby(room.id);
                 
             } catch (error) {
+                console.error('Join game error:', error);
                 showError('joinError', error.message);
                 btn.disabled = false;
                 btn.textContent = 'Join Game';
@@ -1320,7 +1314,10 @@
                 .eq('room_id', roomId)
                 .order('joined_at', { ascending: true });
             
-            if (error) return;
+            if (error) {
+                console.error('Load players error:', error);
+                return;
+            }
             
             state.players = players;
             updateLobby();
@@ -1339,7 +1336,10 @@
                 .eq('room_id', roomId)
                 .eq('round', state.round);
             
-            if (error) return;
+            if (error) {
+                console.error('Load votes error:', error);
+                return;
+            }
             
             state.votes = {};
             votes.forEach(v => {
@@ -1440,6 +1440,7 @@
                 initGameView();
                 
             } catch (error) {
+                console.error('Start game error:', error);
                 showToast('Failed to start: ' + error.message);
                 btn.disabled = false;
                 btn.textContent = 'Start Game';
@@ -1575,19 +1576,70 @@
             btn.textContent = 'Drawing...';
             
             try {
-                const question = getRandomQuestion();
+                const roomId = state.currentUser.room_id;
                 
-                const { error } = await supabase
+                // Get questions not yet used in this session
+                const { data: usedQs, error: usedError } = await supabase
+                    .from('used_questions')
+                    .select('question_id')
+                    .eq('room_id', roomId);
+                
+                if (usedError) throw usedError;
+                
+                const usedIds = usedQs?.map(uq => uq.question_id) || [];
+                
+                let query = supabase.from('questions').select('*');
+                
+                // If there are used questions, exclude them
+                if (usedIds.length > 0) {
+                    query = query.not('id', 'in', `(${usedIds.join(',')})`);
+                }
+                
+                const { data: availableQuestions, error: qError } = await query;
+                
+                let selectedQuestion;
+                
+                if (!availableQuestions || availableQuestions.length === 0) {
+                    // All questions used - reset for this room
+                    await supabase
+                        .from('used_questions')
+                        .delete()
+                        .eq('room_id', roomId);
+                    
+                    // Get all questions fresh
+                    const { data: allQuestions, error: allError } = await supabase
+                        .from('questions')
+                        .select('*');
+                    
+                    if (allError) throw allError;
+                    
+                    selectedQuestion = allQuestions[Math.floor(Math.random() * allQuestions.length)];
+                } else {
+                    selectedQuestion = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+                }
+                
+                // Mark question as used
+                const { error: insertError } = await supabase.from('used_questions').insert({
+                    room_id: roomId,
+                    question_id: selectedQuestion.id,
+                    round_number: state.round
+                });
+                
+                if (insertError) throw insertError;
+                
+                // Update room with current question
+                const { error: updateError } = await supabase
                     .from('rooms')
-                    .update({ current_question: question })
-                    .eq('id', state.currentUser.room_id);
+                    .update({ current_question: selectedQuestion.question_text })
+                    .eq('id', roomId);
                 
-                if (error) throw error;
+                if (updateError) throw updateError;
                 
-                document.getElementById('readerQuestionCard').textContent = question;
+                document.getElementById('readerQuestionCard').textContent = selectedQuestion.question_text;
                 btn.classList.add('hidden');
                 
             } catch (error) {
+                console.error('Draw card error:', error);
                 showToast('Failed to draw card: ' + error.message);
                 btn.disabled = false;
                 btn.textContent = 'Draw Card';
@@ -1628,6 +1680,7 @@
                 document.getElementById('voterStatus').textContent = 'Vote submitted!';
                 
             } catch (error) {
+                console.error('Submit vote error:', error);
                 showToast('Failed to vote: ' + error.message);
                 state.hasVoted = false;
             }
@@ -1675,6 +1728,7 @@
                 if (error) throw error;
                 
             } catch (error) {
+                console.error('Reveal votes error:', error);
                 showToast('Failed to reveal: ' + error.message);
                 btn.disabled = false;
                 btn.textContent = 'Reveal Votes';
@@ -1761,6 +1815,7 @@
                 document.getElementById('continueBtn').disabled = false;
                 
             } catch (error) {
+                console.error('Next round error:', error);
                 showToast('Failed to advance: ' + error.message);
             }
         }
