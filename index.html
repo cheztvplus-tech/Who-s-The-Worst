@@ -1078,15 +1078,17 @@
                     text: q.question_text,
                     category: q.category
                 }));
-            } else {
-                CONFIG.QUESTIONS = getDefaultQuestions();
-            }
-            
-        } catch (error) {
-            console.error('Error loading questions:', error);
+           console.log(`Loaded ${CONFIG.QUESTIONS.length} questions from database`);
+        } else {
+            console.warn('No questions in database, using defaults');
             CONFIG.QUESTIONS = getDefaultQuestions();
         }
+        
+    } catch (error) {
+        console.error('Error loading questions:', error);
+        CONFIG.QUESTIONS = getDefaultQuestions();
     }
+}
 
     function getDefaultQuestions() {
         return [
