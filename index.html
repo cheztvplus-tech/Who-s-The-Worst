@@ -170,6 +170,34 @@
             to { transform: rotate(360deg); }
         }
 
+        .loading-screen {
+            text-align: center;
+            padding: 100px 20px;
+        }
+
+        .loading-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            animation: bounce 1.5s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        .loading-text {
+            color: #feca57;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .loading-subtext {
+            color: #a0a0a0;
+            font-size: 1rem;
+        }
+
         .game-code-display {
             text-align: center;
             background: rgba(0, 0, 0, 0.3);
@@ -442,11 +470,6 @@
             animation: bounce 2s infinite;
         }
 
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
-        }
-
         .winner-name {
             font-size: 2.5rem;
             background: linear-gradient(45deg, #feca57, #ff6b6b);
@@ -675,9 +698,10 @@
     <div class="container">
         <!-- Loading Screen -->
         <div id="loadingScreen" class="screen active">
-            <div style="text-align: center; padding: 100px 20px;">
-                <div class="loading" style="width: 50px; height: 50px; margin-bottom: 20px;"></div>
-                <h2 style="color: #a0a0a0;">Connecting to Supabase...</h2>
+            <div class="loading-screen">
+                <div class="loading-icon">🃏</div>
+                <div class="loading-text">Loading...</div>
+                <div class="loading-subtext">Shuffling the deck</div>
             </div>
         </div>
 
@@ -934,23 +958,26 @@
     <div id="toast" class="toast"></div>
 
     <script>
-        // HARDCODED SUPABASE CONFIG
+        // ==========================================
+        // CONFIGURATION - ONLY DECLARE SUPABASE ONCE
+        // ==========================================
         const SUPABASE_URL = 'https://porpqvphytecuidomcgy.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvcnBxdnBoeXRlY3VpZG9tY2d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQwODUsImV4cCI6MjA4OTgxMDA4NX0.IFECuGpxl4HcMfFx7oqmbsVdeOLMK_4wvEi2L-NGNzI';
-        const ADMIN_PASSWORD = 'worst123'; // Change this to your desired admin password
+        const ADMIN_PASSWORD = 'worst123';
 
-        // Game Configuration
+        // ==========================================
+        // GLOBAL VARIABLES - DECLARED ONCE
+        // ==========================================
+        let supabaseClient = null;  // Changed name to avoid conflicts
+        let realtimeChannel = null;
+        let isAdminLoggedIn = false;
+
         const CONFIG = {
             MIN_PLAYERS: 3,
             POINTS_TO_WIN: 7,
             QUESTIONS: []
         };
 
-        // Global State
-        let supabase = null;
-        let realtimeChannel = null;
-        let isAdminLoggedIn = false;
-        
         const state = {
             currentUser: null,
             roomCode: null,
@@ -966,46 +993,47 @@
             round: 1
         };
 
-        // Initialize - Auto connect on load
+        // ==========================================
+        // INITIALIZATION
+        // ==========================================
         window.onload = function() {
             initSupabase();
         };
 
-        // Initialize Supabase with hardcoded credentials
         async function initSupabase() {
             try {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                // Create client only once
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                 
                 // Test connection
-                const { error } = await supabase.from('rooms').select('count', { count: 'exact', head: true });
+                const { error } = await supabaseClient.from('rooms').select('count', { count: 'exact', head: true });
                 
                 if (error && error.code !== 'PGRST116') {
                     throw error;
                 }
                 
                 updateConnectionStatus(true);
-                
-                // Load questions
                 await loadQuestionsFromSupabase();
-                
                 showScreen('joinScreen');
                 showToast(`Connected! Loaded ${CONFIG.QUESTIONS.length} questions`);
                 
             } catch (error) {
                 console.error('Connection error:', error);
+                updateConnectionStatus(false);
                 showScreen('joinScreen');
-                showToast('Connection failed. Some features may not work.');
+                showToast('Connection failed. Check console.');
             }
         }
 
-        // Admin Functions
+        // ==========================================
+        // ADMIN FUNCTIONS
+        // ==========================================
         function showAdminLogin() {
             showScreen('adminLoginScreen');
         }
 
         function adminLogin() {
             const password = document.getElementById('adminPassword').value;
-            const btn = document.getElementById('adminLoginBtn');
             
             if (password === ADMIN_PASSWORD) {
                 isAdminLoggedIn = true;
@@ -1034,10 +1062,12 @@
             }
         }
 
-        // Load questions from Supabase
+        // ==========================================
+        // QUESTIONS MANAGEMENT
+        // ==========================================
         async function loadQuestionsFromSupabase() {
             try {
-                const { data: questions, error } = await supabase
+                const { data: questions, error } = await supabaseClient
                     .from('questions')
                     .select('*')
                     .order('created_at', { ascending: true });
@@ -1059,7 +1089,6 @@
             }
         }
 
-        // Fallback default questions
         function getDefaultQuestions() {
             return [
                 { text: "Who would survive the longest in a zombie apocalypse?", category: "Random" },
@@ -1075,7 +1104,6 @@
             ];
         }
 
-        // Get random question
         function getRandomQuestion() {
             if (CONFIG.QUESTIONS.length === 0) {
                 return "Who is the worst? (No questions loaded)";
@@ -1100,7 +1128,7 @@
             }
             
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('questions')
                     .insert({
                         question_text: text,
@@ -1114,7 +1142,6 @@
                 
                 input.value = '';
                 showToast('Question added!');
-                
                 await loadQuestionsFromSupabase();
                 
             } catch (error) {
@@ -1123,7 +1150,7 @@
         }
 
         async function loadQuestionsList() {
-            const { data: questions, error } = await supabase
+            const { data: questions, error } = await supabaseClient
                 .from('questions')
                 .select('*')
                 .order('created_at', { ascending: false });
@@ -1144,7 +1171,9 @@
             `).join('');
         }
 
-        // Room Management
+        // ==========================================
+        // ROOM MANAGEMENT
+        // ==========================================
         async function createRoom() {
             const username = document.getElementById('usernameInput').value.trim();
             
@@ -1161,7 +1190,7 @@
             const code = Math.random().toString(36).substring(2, 8).toUpperCase();
             
             try {
-                const { data: room, error } = await supabase
+                const { data: room, error } = await supabaseClient
                     .from('rooms')
                     .insert({
                         code: code,
@@ -1174,7 +1203,7 @@
                 
                 if (error) throw error;
                 
-                const { data: player, error: playerError } = await supabase
+                const { data: player, error: playerError } = await supabaseClient
                     .from('players')
                     .insert({
                         room_id: room.id,
@@ -1213,7 +1242,7 @@
             btn.innerHTML = 'Joining... <div class="loading"></div>';
             
             try {
-                const { data: room, error: roomError } = await supabase
+                const { data: room, error: roomError } = await supabaseClient
                     .from('rooms')
                     .select('*')
                     .eq('code', roomCode)
@@ -1227,7 +1256,7 @@
                     throw new Error('Game already started');
                 }
                 
-                const { data: existingPlayers, error: countError } = await supabase
+                const { data: existingPlayers, error: countError } = await supabaseClient
                     .from('players')
                     .select('*')
                     .eq('room_id', room.id);
@@ -1240,7 +1269,7 @@
                     throw new Error('Name taken');
                 }
                 
-                const { data: player, error: playerError } = await supabase
+                const { data: player, error: playerError } = await supabaseClient
                     .from('players')
                     .insert({
                         room_id: room.id,
@@ -1283,9 +1312,11 @@
             subscribeToRoom(roomId);
         }
 
-        // Real-time Subscription
+        // ==========================================
+        // REALTIME SUBSCRIPTION
+        // ==========================================
         function subscribeToRoom(roomId) {
-            realtimeChannel = supabase
+            realtimeChannel = supabaseClient
                 .channel('room:' + roomId)
                 .on('postgres_changes', 
                     { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId },
@@ -1308,7 +1339,7 @@
         }
 
         async function loadPlayers(roomId) {
-            const { data: players, error } = await supabase
+            const { data: players, error } = await supabaseClient
                 .from('players')
                 .select('*')
                 .eq('room_id', roomId)
@@ -1330,7 +1361,7 @@
         }
 
         async function loadVotes(roomId) {
-            const { data: votes, error } = await supabase
+            const { data: votes, error } = await supabaseClient
                 .from('votes')
                 .select('*')
                 .eq('room_id', roomId)
@@ -1379,6 +1410,9 @@
             }
         }
 
+        // ==========================================
+        // GAME LOGIC
+        // ==========================================
         function updateLobby() {
             document.getElementById('playerCount').textContent = state.players.length;
             
@@ -1424,7 +1458,7 @@
                 const scores = {};
                 state.players.forEach(p => scores[p.id] = 0);
                 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('rooms')
                     .update({
                         game_state: 'playing',
@@ -1579,7 +1613,7 @@
                 const roomId = state.currentUser.room_id;
                 
                 // Get questions not yet used in this session
-                const { data: usedQs, error: usedError } = await supabase
+                const { data: usedQs, error: usedError } = await supabaseClient
                     .from('used_questions')
                     .select('question_id')
                     .eq('room_id', roomId);
@@ -1588,7 +1622,7 @@
                 
                 const usedIds = usedQs?.map(uq => uq.question_id) || [];
                 
-                let query = supabase.from('questions').select('*');
+                let query = supabaseClient.from('questions').select('*');
                 
                 // If there are used questions, exclude them
                 if (usedIds.length > 0) {
@@ -1601,13 +1635,13 @@
                 
                 if (!availableQuestions || availableQuestions.length === 0) {
                     // All questions used - reset for this room
-                    await supabase
+                    await supabaseClient
                         .from('used_questions')
                         .delete()
                         .eq('room_id', roomId);
                     
                     // Get all questions fresh
-                    const { data: allQuestions, error: allError } = await supabase
+                    const { data: allQuestions, error: allError } = await supabaseClient
                         .from('questions')
                         .select('*');
                     
@@ -1619,7 +1653,7 @@
                 }
                 
                 // Mark question as used
-                const { error: insertError } = await supabase.from('used_questions').insert({
+                const { error: insertError } = await supabaseClient.from('used_questions').insert({
                     room_id: roomId,
                     question_id: selectedQuestion.id,
                     round_number: state.round
@@ -1628,7 +1662,7 @@
                 if (insertError) throw insertError;
                 
                 // Update room with current question
-                const { error: updateError } = await supabase
+                const { error: updateError } = await supabaseClient
                     .from('rooms')
                     .update({ current_question: selectedQuestion.question_text })
                     .eq('id', roomId);
@@ -1655,7 +1689,7 @@
             document.getElementById(`vote-${targetId}`).classList.add('selected');
             
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('votes')
                     .insert({
                         room_id: state.currentUser.room_id,
@@ -1668,7 +1702,7 @@
                 if (error) throw error;
                 
                 if (doubleDown) {
-                    await supabase
+                    await supabaseClient
                         .from('players')
                         .update({ double_down_used: true })
                         .eq('id', state.currentUser.id);
@@ -1716,7 +1750,7 @@
                     }
                 });
                 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('rooms')
                     .update({
                         game_state: 'results',
@@ -1792,7 +1826,7 @@
                 const currentIdx = state.players.findIndex(p => p.id === state.currentReader);
                 const nextReader = state.players[(currentIdx + 1) % state.players.length]?.id;
                 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('rooms')
                     .update({
                         game_state: 'playing',
@@ -1803,7 +1837,7 @@
                     })
                     .eq('id', roomId);
                 
-                await supabase
+                await supabaseClient
                     .from('votes')
                     .delete()
                     .eq('room_id', roomId)
@@ -1842,16 +1876,16 @@
 
         async function leaveRoom() {
             if (realtimeChannel) {
-                supabase.removeChannel(realtimeChannel);
+                supabaseClient.removeChannel(realtimeChannel);
                 realtimeChannel = null;
             }
             
             try {
                 if (state.currentUser) {
-                    await supabase.from('players').delete().eq('id', state.currentUser.id);
+                    await supabaseClient.from('players').delete().eq('id', state.currentUser.id);
                     
                     if (state.isHost && state.currentUser.room_id) {
-                        await supabase.from('rooms').delete().eq('id', state.currentUser.room_id);
+                        await supabaseClient.from('rooms').delete().eq('id', state.currentUser.room_id);
                     }
                 }
             } catch (e) {
@@ -1890,7 +1924,9 @@
             });
         }
 
-        // Utility Functions
+        // ==========================================
+        // UTILITY FUNCTIONS
+        // ==========================================
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
