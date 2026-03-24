@@ -1146,33 +1146,40 @@
 
         // Room Management
         async function createRoom() {
-            const username = document.getElementById('usernameInput').value.trim();
-            
-            if (!username) {
-                showError('joinError', 'Enter your name first');
-                return;
-            }
-            
-            if (username.length < 2) {
-                showError('joinError', 'Name too short');
-                return;
-            }
-            
-            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-            
-            try {
-                const { data: room, error } = await supabase
-                    .from('rooms')
-                    .insert({
-                        code: code,
-                        game_state: 'waiting',
-                        current_round: 1,
-                        created_at: new Date().toISOString()
-                    })
-                    .select()
-                    .single();
-                
-                if (error) throw error;
+    const username = document.getElementById('usernameInput').value.trim();
+    
+    if (!username) {
+        showError('joinError', 'Enter your name first');
+        return;
+    }
+    
+    if (username.length < 2) {
+        showError('joinError', 'Name too short');
+        return;
+    }
+    
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    try {
+        console.log('Creating room with code:', code); // DEBUG
+        
+        const { data: room, error } = await supabase
+            .from('rooms')
+            .insert({
+                code: code,
+                game_state: 'waiting',
+                current_round: 1,
+                created_at: new Date().toISOString()
+            })
+            .select()
+            .single();
+        
+        if (error) {
+            console.error('Supabase error:', error); // DEBUG
+            throw error;
+        }
+        
+        console.log('Room created:', room); // DEBUG
                 
                 const { data: player, error: playerError } = await supabase
                     .from('players')
@@ -1195,7 +1202,8 @@
                 enterLobby(room.id);
                 
             } catch (error) {
-                showError('joinError', 'Failed to create room: ' + error.message);
+        console.error('Full error:', error); // DEBUG - Check browser console for this
+        showError('joinError', 'Failed to create room: ' + error.message);
             }
         }
 
