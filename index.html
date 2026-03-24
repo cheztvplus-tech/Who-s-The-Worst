@@ -1303,28 +1303,30 @@
     }
 
     async function loadPlayers(roomId) {
-        console.log('Loading players for room:', roomId);
-        const { data: players, error } = await supabaseClient
-            .from('players')
-            .select('*')
-            .eq('room_id', roomId)
-            .order('joined_at', { ascending: true });
-        
-        if (error) {
-            console.error('Load players error:', error);
-            return;
-        }
-        
-        console.log('Loaded players:', players?.length || 0, players?.map(p => p.name));
-        state.players = players || [];
-        updateLobby();
-        
-        const updatedMe = players?.find(p => p.id === state.currentUser?.id);
-        if (updatedMe) {
-            state.currentUser = updatedMe;
-            state.isHost = updatedMe.is_host;
-        }
+    console.log('Loading players for room:', roomId);
+    const { data: players, error } = await supabaseClient
+        .from('players')
+        .select('*')
+        .eq('room_id', roomId)
+        .order('joined_at', { ascending: true });
+    
+    if (error) {
+        console.error('Load players error:', error);
+        return;
     }
+    
+    console.log('Loaded players:', players?.length || 0, players?.map(p => p.name));
+    state.players = players || [];
+    updateLobby();
+    
+    // CRITICAL: Always update currentUser to match our player record
+    const updatedMe = players?.find(p => p.id === state.currentUser?.id);
+    if (updatedMe) {
+        console.log('Updated current user:', updatedMe.name, 'ID:', updatedMe.id);
+        state.currentUser = updatedMe;
+        state.isHost = updatedMe.is_host;
+    }
+}
 
     async function loadVotes(roomId) {
         const { data: votes, error } = await supabaseClient
@@ -1347,39 +1349,50 @@
     }
 
     function handleRoomChange(room) {
-        if (!room) return;
-        
-        console.log('Handling room change:', { 
-            gameState: room.game_state, 
-            currentReader: room.current_reader,
-            currentQuestion: room.current_question,
-            round: room.current_round
-        });
-        
-        state.gameState = room.game_state;
-        state.currentQuestion = room.current_question;
-        state.currentReader = room.current_reader;
-        state.round = room.current_round;
-        
-        if (room.scores) state.scores = room.scores;
-        
-        // If game is playing or results, switch to game screen
-        if (state.gameState === 'playing' || state.gameState === 'results') {
-            if (document.getElementById('lobbyScreen').classList.contains('active')) {
-                console.log('Switching to game screen');
-                showScreen('gameScreen');
-            }
+    if (!room) return;
+    
+    console.log('Handling room change:', { 
+        gameState: room.game_state, 
+        currentReader: room.current_reader,
+        currentQuestion: room.current_question,
+        round: room.current_round
+    });
+    
+    state.gameState = room.game_state;
+    state.currentQuestion = room.current_question;
+    state.currentReader = room.current_reader;
+    state.round = room.current_round;
+    
+    if (room.scores) state.scores = room.scores;
+    
+    // If game is playing or results, switch to game screen
+    if (state.gameState === 'playing' || state.gameState === 'results') {
+        if (document.getElementById('lobbyScreen').classList.contains('active')) {
+            console.log('Switching to game screen');
+            showScreen('gameScreen');
+            
+            // CRITICAL: Wait for DOM update then initialize view
+            setTimeout(() => {
+                console.log('Initializing game view after delay');
+                console.log('Current user ID:', state.currentUser?.id);
+                console.log('Current reader ID:', state.currentReader);
+                console.log('Are they equal?', state.currentReader === state.currentUser?.id);
+                initGameView();
+            }, 100);
+        } else {
+            // Already on game screen, just update
             updateGameView();
         }
-        
-        // Check for winner
-        if (state.scores && Object.entries(state.scores).length > 0) {
-            const winner = Object.entries(state.scores).find(([id, score]) => score >= CONFIG.POINTS_TO_WIN);
-            if (winner && !document.getElementById('winnerScreen').classList.contains('active')) {
-                showWinner(winner[0]);
-            }
+    }
+    
+    // Check for winner
+    if (state.scores && Object.entries(state.scores).length > 0) {
+        const winner = Object.entries(state.scores).find(([id, score]) => score >= CONFIG.POINTS_TO_WIN);
+        if (winner && !document.getElementById('winnerScreen').classList.contains('active')) {
+            showWinner(winner[0]);
         }
     }
+}
 
     function updateLobby() {
         document.getElementById('playerCount').textContent = state.players.length;
