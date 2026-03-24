@@ -1771,7 +1771,7 @@ async function drawCard() {
         const safeId = (card.id || '').replace(/'/g, "\\'");
         
         cardsHTML += `
-            <div class="card-container" id="card-${index}" onclick="flipAndSelectCard(${index}, '${safeId}', '${safeText}', '${safeCategory}', '${roomId')">
+            <div class="card-container" id="card-${index}" onclick="flipAndSelectCard(${index}, '${safeId}', '${safeText}', '${safeCategory}', '${roomId}')">
                 <div class="card-inner">
                     <!-- Front of card (shows category) -->
                     <div class="card-front">
