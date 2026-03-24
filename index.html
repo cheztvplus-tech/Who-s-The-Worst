@@ -1609,10 +1609,7 @@
         btn.classList.toggle('active');
     }
 
-    // ==========================================
-    // FIXED DRAW CARD FUNCTION
-    // ==========================================
-    // ==========================================
+// ==========================================
 // 3-CARD DRAW MECHANIC
 // ==========================================
 async function drawCard() {
@@ -1620,8 +1617,12 @@ async function drawCard() {
     btn.disabled = true;
     btn.textContent = 'Drawing...';
     
+    console.log('=== DRAW CARD STARTED ===');
+    console.log('Current questions in memory:', CONFIG.QUESTIONS.length);
+    
     try {
         const roomId = state.currentUser.room_id;
+        console.log('Room ID:', roomId);
         
         // Get already used question IDs for this room
         const { data: usedQs, error: usedError } = await supabaseClient
@@ -1629,25 +1630,38 @@ async function drawCard() {
             .select('question_id')
             .eq('room_id', roomId);
         
-        if (usedError) throw usedError;
+        if (usedError) {
+            console.error('Error fetching used questions:', usedError);
+            throw usedError;
+        }
+        
+        console.log('Used questions:', usedQs);
         
         const usedIds = usedQs?.map(uq => uq.question_id) || [];
+        console.log('Used IDs:', usedIds);
         
         // Get available questions
-        let availableQuestions = CONFIG.QUESTIONS.filter(q => !usedIds.includes(q.id));
+        let availableQuestions = CONFIG.QUESTIONS.filter(q => {
+            const isUsed = usedIds.includes(q.id);
+            console.log(`Question ${q.id} (${q.text.substring(0, 30)}...): used=${isUsed}`);
+            return !isUsed;
+        });
+        
+        console.log('Available questions:', availableQuestions.length);
         
         // If not enough questions available, reset used questions
         if (availableQuestions.length < 3) {
-            console.log('Resetting used questions...');
+            console.log('Less than 3 questions available, resetting...');
             await supabaseClient
                 .from('used_questions')
                 .delete()
                 .eq('room_id', roomId);
             availableQuestions = CONFIG.QUESTIONS;
+            console.log('After reset, available:', availableQuestions.length);
         }
         
         if (availableQuestions.length === 0) {
-            throw new Error('No questions available');
+            throw new Error('No questions available - check if questions loaded from database');
         }
         
         // Draw 3 random questions (or fewer if not enough available)
@@ -1658,16 +1672,16 @@ async function drawCard() {
         for (let i = 0; i < numCards; i++) {
             const randomIdx = Math.floor(Math.random() * tempQuestions.length);
             drawnCards.push(tempQuestions[randomIdx]);
-            tempQuestions.splice(randomIdx, 1); // Remove so we don't pick duplicates
+            tempQuestions.splice(randomIdx, 1);
         }
         
-        console.log('Drawn cards:', drawnCards);
+        console.log('Drawn cards:', drawnCards.map(c => ({id: c.id, category: c.category, text: c.text.substring(0, 50)})));
         
         // Show card picker UI
         showCardPicker(drawnCards, roomId);
         
     } catch (error) {
-        console.error('Draw card error:', error);
+        console.error('=== DRAW CARD ERROR ===', error);
         showToast('Failed to draw cards: ' + error.message);
         btn.disabled = false;
         btn.textContent = 'Draw Card';
@@ -1675,88 +1689,103 @@ async function drawCard() {
 }
 
 function showCardPicker(cards, roomId) {
+    console.log('=== SHOW CARD PICKER ===');
+    console.log('Cards to display:', cards.length);
+    
     const btn = document.getElementById('drawCardBtn');
     const readerView = document.getElementById('readerView');
     
-    // Create card picker HTML with category on the back
-    const pickerHTML = `
-        <div class="card-picker" style="text-align: center; margin-bottom: 20px;">
-            <h3 style="color: #feca57; margin-bottom: 20px;">Pick a Question</h3>
-            <div class="cards-container" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px;">
-                ${cards.map((card, index) => `
-                    <div class="playing-card" onclick="selectCard('${card.id}', '${card.text.replace(/'/g, "\\'")}', '${card.category?.replace(/'/g, "\\'") || 'Question'}', '${roomId}')" 
-                         style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-                                border-radius: 15px;
-                                padding: 20px;
-                                width: 160px;
-                                height: 220px;
-                                cursor: pointer;
-                                transition: all 0.3s ease;
-                                display: flex;
-                                flex-direction: column;
-                                align-items: center;
-                                justify-content: center;
-                                border: 3px solid rgba(255, 255, 255, 0.2);
-                                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-                                position: relative;
-                                overflow: hidden;"
-                         onmouseover="this.style.transform='translateY(-10px) scale(1.02)'; this.style.boxShadow='0 15px 35px rgba(102, 126, 234, 0.4)'; this.style.borderColor='rgba(254, 202, 87, 0.6)';"
-                         onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 8px 20px rgba(0, 0, 0, 0.3)'; this.style.borderColor='rgba(255, 255, 255, 0.2)';">
-                        
-                        <!-- Card Pattern Background -->
-                        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
-                                    background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.03) 10px, rgba(255,255,255,0.03) 20px);
-                                    pointer-events: none;"></div>
-                        
-                        <!-- Top Corner -->
-                        <div style="position: absolute; top: 10px; left: 10px; font-size: 1.5rem; color: #feca57; font-weight: bold;">🃏</div>
-                        <div style="position: absolute; top: 10px; right: 10px; font-size: 1.5rem; color: #feca57; font-weight: bold;">🃏</div>
-                        
-                        <!-- Center Category Display -->
-                        <div style="text-align: center; z-index: 1;">
-                            <div style="font-size: 3rem; margin-bottom: 15px;">❓</div>
-                            <div style="color: #feca57; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: 600;">Category</div>
-                            <div style="color: #fff; font-size: 1rem; font-weight: bold; line-height: 1.3; padding: 0 10px; text-align: center;">
-                                ${card.category || 'Random'}
-                            </div>
-                        </div>
-                        
-                        <!-- Bottom Corner (inverted) -->
-                        <div style="position: absolute; bottom: 10px; right: 10px; font-size: 1.5rem; color: #feca57; font-weight: bold; transform: rotate(180deg);">🃏</div>
-                        <div style="position: absolute; bottom: 10px; left: 10px; font-size: 1.5rem; color: #feca57; font-weight: bold; transform: rotate(180deg);">🃏</div>
-                        
-                        <!-- Card Number -->
-                        <div style="position: absolute; bottom: 40px; color: rgba(255,255,255,0.4); font-size: 0.75rem; letter-spacing: 2px;">CARD ${index + 1}</div>
-                    </div>
-                `).join('')}
-            </div>
-            <p style="color: #a0a0a0; font-size: 0.9rem; margin-top: 10px;">Tap a card to reveal the question</p>
-        </div>
-    `;
+    if (!readerView) {
+        console.error('readerView not found!');
+        return;
+    }
     
     // Remove existing picker
     const existingPicker = document.getElementById('cardPicker');
-    if (existingPicker) existingPicker.remove();
+    if (existingPicker) {
+        console.log('Removing existing picker');
+        existingPicker.remove();
+    }
     
-    // Insert picker
+    // Create card picker HTML
+    let cardsHTML = '';
+    cards.forEach((card, index) => {
+        console.log(`Building card ${index + 1}:`, card.category);
+        const safeText = (card.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const safeCategory = (card.category || 'Question').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const safeId = (card.id || '').replace(/'/g, "\\'");
+        
+        cardsHTML += `
+            <div class="playing-card" onclick="selectCard('${safeId}', '${safeText}', '${safeCategory}', '${roomId}')" 
+                 style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                        border-radius: 15px;
+                        padding: 15px;
+                        width: 140px;
+                        height: 200px;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        border: 3px solid rgba(255, 255, 255, 0.2);
+                        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+                        position: relative;
+                        overflow: hidden;
+                        margin: 5px;"
+                 onmouseover="this.style.transform='translateY(-10px) scale(1.02)'; this.style.boxShadow='0 15px 35px rgba(102, 126, 234, 0.4)'; this.style.borderColor='rgba(254, 202, 87, 0.6)';"
+                 onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 8px 20px rgba(0, 0, 0, 0.3)'; this.style.borderColor='rgba(255, 255, 255, 0.2)';">
+                
+                <div style="position: absolute; top: 8px; left: 8px; font-size: 1.2rem;">🃏</div>
+                <div style="position: absolute; top: 8px; right: 8px; font-size: 1.2rem;">🃏</div>
+                
+                <div style="text-align: center; z-index: 1; width: 100%;">
+                    <div style="font-size: 2.5rem; margin-bottom: 10px;">❓</div>
+                    <div style="color: #feca57; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-weight: 600;">Category</div>
+                    <div style="color: #fff; font-size: 0.85rem; font-weight: bold; line-height: 1.2; padding: 0 5px; text-align: center; max-height: 80px; overflow: hidden;">
+                        ${card.category || 'Random'}
+                    </div>
+                </div>
+                
+                <div style="position: absolute; bottom: 8px; right: 8px; font-size: 1.2rem; transform: rotate(180deg);">🃏</div>
+                <div style="position: absolute; bottom: 8px; left: 8px; font-size: 1.2rem; transform: rotate(180deg);">🃏</div>
+                
+                <div style="position: absolute; bottom: 35px; color: rgba(255,255,255,0.4); font-size: 0.7rem; letter-spacing: 1px;">CARD ${index + 1}</div>
+            </div>
+        `;
+    });
+    
+    const pickerHTML = `
+        <div id="cardPicker" style="text-align: center; margin-bottom: 20px; animation: fadeIn 0.3s ease;">
+            <h3 style="color: #feca57; margin-bottom: 15px;">Pick a Question</h3>
+            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
+                ${cardsHTML}
+            </div>
+            <p style="color: #a0a0a0; font-size: 0.85rem; margin-top: 10px;">Tap a card to reveal the question</p>
+        </div>
+    `;
+    
+    // Insert picker before the action buttons
+    const actionButtons = document.getElementById('drawCardBtn').parentNode;
+    
+    // Create a container div
     const pickerDiv = document.createElement('div');
-    pickerDiv.id = 'cardPicker';
     pickerDiv.innerHTML = pickerHTML;
     
-    const questionCard = document.getElementById('readerQuestionCard');
-    questionCard.style.display = 'none';
+    readerView.insertBefore(pickerDiv.firstElementChild, actionButtons);
     
-    readerView.insertBefore(pickerDiv, document.getElementById('drawCardBtn').parentNode);
-    
-    // Hide draw button
+    // Hide draw button and question card
+    document.getElementById('readerQuestionCard').style.display = 'none';
     btn.classList.add('hidden');
+    
+    console.log('Card picker inserted successfully');
 }
 
 async function selectCard(questionId, questionText, category, roomId) {
+    console.log('=== SELECT CARD ===', {questionId, category, roomId});
+    
     try {
-        console.log('Selected card:', questionId, questionText, category);
-        
-        // Remove picker with animation
+        // Remove picker
         const picker = document.getElementById('cardPicker');
         if (picker) {
             picker.style.transition = 'opacity 0.3s ease';
@@ -1764,7 +1793,7 @@ async function selectCard(questionId, questionText, category, roomId) {
             setTimeout(() => picker.remove(), 300);
         }
         
-        // Show the selected question with category badge
+        // Show the selected question
         const questionCard = document.getElementById('readerQuestionCard');
         questionCard.style.display = 'flex';
         questionCard.style.flexDirection = 'column';
@@ -1772,11 +1801,12 @@ async function selectCard(questionId, questionText, category, roomId) {
             <div style="font-size: 0.75rem; color: #feca57; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; font-weight: 600;">
                 📁 ${category || 'Question'}
             </div>
-            <div>${questionText}</div>
+            <div style="font-size: 1.2rem;">${questionText}</div>
         `;
         
         // Mark this question as used
         if (questionId) {
+            console.log('Marking question as used:', questionId);
             const { error: insertError } = await supabaseClient.from('used_questions').insert({
                 room_id: roomId,
                 question_id: questionId,
@@ -1796,11 +1826,10 @@ async function selectCard(questionId, questionText, category, roomId) {
         
         if (updateError) throw updateError;
         
-        // Show waiting for votes message
         showToast('Question revealed! Waiting for votes...');
         
     } catch (error) {
-        console.error('Select card error:', error);
+        console.error('=== SELECT CARD ERROR ===', error);
         showToast('Failed to select card: ' + error.message);
     }
 }
