@@ -2021,8 +2021,9 @@
         
         const drawBtn = document.getElementById('drawCardBtn');
         drawBtn.disabled = false;
-        drawBtn.textContent = 'Confirm Vote';
+        drawBtn.textContent = 'Confirm Vote ✓';
         drawBtn.onclick = confirmInstigatorVote;
+        drawBtn.classList.remove('hidden');
         
         showToast('Player selected! Tap Confirm to lock in');
     }
