@@ -1159,7 +1159,7 @@
                 </div>
             </div>
 
-            <button class="btn-secondary" onclick="leaveRoom()">Leave Room</button>
+            <button class="btn-secondary" onclick="leaveRoom()" style="margin-top: 15px;">🚪 Leave Room</button>
         </div>
 
         <!-- Game Screen -->
@@ -1880,7 +1880,12 @@
             
             console.log('Room updated successfully');
             
-            // Manually trigger game view update since we might not get realtime event immediately
+            // Set local state BEFORE calling initGameView so isInstigator works correctly
+            state.currentReader = startingReader;
+            state.gameState = 'playing';
+            state.scores = scores;
+            state.doubleDownPenalty = state.doubleDownPenalty || 'lose_card';
+
             showScreen('gameScreen');
             initGameView();
             
