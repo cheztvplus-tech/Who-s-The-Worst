@@ -756,6 +756,218 @@
                 font-size: 1.7rem;
             }
         }
+
+        /* ===== 3D CARD FLIP STYLES ===== */
+        .card-picker-wrapper {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .card-picker-title {
+            color: #feca57;
+            font-size: 1.1rem;
+            margin-bottom: 18px;
+            font-weight: bold;
+        }
+
+        .cards-row {
+            display: flex;
+            gap: 14px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .flip-card-container {
+            width: 140px;
+            height: 190px;
+            perspective: 900px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1);
+            border-radius: 14px;
+        }
+
+        .flip-card-container.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .flip-card-front,
+        .flip-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 14px;
+            border: 2px solid transparent;
+            box-sizing: border-box;
+        }
+
+        .flip-card-front {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .flip-card-front:hover {
+            border-color: #feca57;
+            box-shadow: 0 12px 35px rgba(254, 202, 87, 0.3);
+        }
+
+        .flip-card-back {
+            background: linear-gradient(135deg, #1a1a2e 0%, #2a1a4e 100%);
+            border-color: #feca57;
+            transform: rotateY(180deg);
+            box-shadow: 0 8px 25px rgba(254, 202, 87, 0.3);
+        }
+
+        .flip-card-front .card-emoji {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+        }
+
+        .flip-card-front .card-category {
+            color: #feca57;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            text-align: center;
+        }
+
+        .flip-card-front .card-label {
+            color: #fff;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .flip-card-back .card-question-text {
+            color: #fff;
+            font-size: 0.82rem;
+            font-weight: 600;
+            line-height: 1.4;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .flip-card-back .card-category-back {
+            color: #feca57;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+        }
+
+        .flip-card-back .pick-this-btn {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: #1a1a2e;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: auto;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: transform 0.2s;
+        }
+
+        .flip-card-back .pick-this-btn:active {
+            transform: scale(0.95);
+        }
+
+        .card-picker-hint {
+            color: #a0a0a0;
+            font-size: 0.82rem;
+            margin-top: 4px;
+        }
+
+        /* ===== DOUBLE DOWN PENALTY MODAL ===== */
+        .penalty-modal {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 4000;
+            padding: 20px;
+        }
+
+        .penalty-modal.active { display: flex; }
+
+        .penalty-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 20px;
+            padding: 28px;
+            max-width: 420px;
+            width: 100%;
+            border: 1px solid rgba(255,255,255,0.15);
+            text-align: center;
+        }
+
+        .penalty-content h3 {
+            color: #feca57;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        .penalty-content p {
+            color: #a0a0a0;
+            margin-bottom: 22px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .penalty-options {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .penalty-option {
+            flex: 1;
+            padding: 16px 10px;
+            border-radius: 14px;
+            border: 2px solid rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.05);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .penalty-option:hover, .penalty-option.selected {
+            border-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.12);
+        }
+
+        .penalty-option .penalty-icon {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+        }
+
+        .penalty-option .penalty-label {
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .penalty-option .penalty-desc {
+            font-size: 0.75rem;
+            color: #a0a0a0;
+        }
     </style>
 </head>
 <body>
@@ -921,6 +1133,22 @@
                     <div class="status-bar" id="startStatus">
                         Need at least 3 players to start
                     </div>
+                    <!-- Double Down Penalty Setting -->
+                    <div id="penaltySettingBox" style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 14px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.1);">
+                        <div style="color: #feca57; font-size: 0.85rem; font-weight: bold; margin-bottom: 10px;">🚀 Double Down Penalty (Wrong guess):</div>
+                        <div style="display: flex; gap: 8px;">
+                            <div onclick="setPenalty('lose_card')" id="penaltyLoseCard" class="penalty-option selected" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid #ff6b6b; background:rgba(255,107,107,0.12); cursor:pointer; text-align:center;">
+                                <div style="font-size:1.2rem;">🃏</div>
+                                <div style="font-size:0.75rem; font-weight:bold; margin-top:4px;">Lose Card</div>
+                                <div style="font-size:0.65rem; color:#a0a0a0;">No penalty pts</div>
+                            </div>
+                            <div onclick="setPenalty('minus_two')" id="penaltyMinusTwo" class="penalty-option" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); cursor:pointer; text-align:center;">
+                                <div style="font-size:1.2rem;">💀</div>
+                                <div style="font-size:0.75rem; font-weight:bold; margin-top:4px;">-2 Points</div>
+                                <div style="font-size:0.65rem; color:#a0a0a0;">Harsh mode</div>
+                            </div>
+                        </div>
+                    </div>
                     <button class="btn-primary" onclick="startGame()" id="startBtn" disabled>
                         Start Game
                     </button>
@@ -940,17 +1168,17 @@
 
             <!-- Reader View -->
             <div id="readerView" style="display: none;">
-                <div class="status-bar active">
-                    📖 You are the Reader
+                <div class="status-bar active" id="instigatorStatusBar">
+                    🎯 You are the Instigator
                 </div>
                 
                 <div class="question-card" id="readerQuestionCard">
-                    Tap "Draw Card" when everyone is ready
+                    Draw 3 cards to begin your round
                 </div>
 
                 <div class="action-buttons">
-                    <button class="btn-primary" onclick="drawCard()" id="drawCardBtn">Draw Card</button>
-                    <button class="btn-success hidden" onclick="revealVotes()" id="revealBtn">Reveal Votes</button>
+                    <button class="btn-primary" onclick="drawCard()" id="drawCardBtn">🃏 Draw Cards</button>
+                    <button class="btn-success hidden" onclick="revealVotes()" id="revealBtn">🎉 Reveal Votes</button>
                     <button class="btn-primary hidden" onclick="nextRound()" id="nextRoundBtn">Next Round</button>
                 </div>
 
@@ -980,7 +1208,8 @@
                 </div>
 
                 <div id="votingSection" style="display: none;">
-                    <h4 style="margin-bottom: 10px; text-align: center;">Who fits best?</h4>
+                    <h4 style="margin-bottom: 10px; text-align: center; color: #feca57;">Who did the Instigator pick?</h4>
+                    <p style="text-align:center; font-size:0.82rem; color:#a0a0a0; margin-bottom: 12px;">Vote for who you think the Instigator chose</p>
                     <div class="vote-grid" id="voteOptions"></div>
                 </div>
 
@@ -998,11 +1227,17 @@
                 
                 <div class="question-card" id="resultQuestion" style="font-size: 1.1rem; min-height: auto; padding: 20px;"></div>
 
+                <div class="card" style="text-align: center; margin-bottom: 15px;">
+                    <h4 style="color: #a0a0a0; margin-bottom: 6px; font-size: 0.85rem; text-transform: uppercase;">🎯 Instigator picked:</h4>
+                    <div id="instigatorPickDisplay" style="font-size: 1.6rem; font-weight: bold; color: #ff6b6b; margin-bottom: 8px;"></div>
+                    <div style="font-size: 0.8rem; color: #a0a0a0;">Correct guesses earn points • Instigator earns no points</div>
+                </div>
+
                 <div class="results-container" id="resultsList"></div>
 
-                <div class="card" style="text-align: center;">
-                    <h4 style="color: #feca57; margin-bottom: 10px;">Majority Voted For:</h4>
-                    <div id="majorityTarget" style="font-size: 1.5rem; font-weight: bold; color: #2ecc71;"></div>
+                <div class="card" style="text-align: center; margin-bottom: 15px;" id="majorityFallbackCard" style="display:none;">
+                    <h4 style="color: #feca57; margin-bottom: 10px; font-size: 0.85rem;">Nobody matched — majority vote wins:</h4>
+                    <div id="majorityTarget" style="font-size: 1.4rem; font-weight: bold; color: #2ecc71;"></div>
                 </div>
 
                 <button class="btn-primary" onclick="acknowledgeResults()" id="continueBtn">
@@ -1087,7 +1322,10 @@
         scores: {},
         doubleDownUsed: false,
         hasVoted: false,
-        round: 1
+        round: 1,
+        instigatorVote: null,
+        instigatorVoteConfirmed: false,
+        doubleDownPenalty: 'lose_card' // 'lose_card' or 'minus_two'
     };
 
     // ==========================================
@@ -1198,6 +1436,14 @@
     function logoutAdmin() {
         isAdminLoggedIn = false;
         showScreen('joinScreen');
+    }
+
+    function setPenalty(type) {
+        state.doubleDownPenalty = type;
+        document.getElementById('penaltyLoseCard').style.borderColor = type === 'lose_card' ? '#ff6b6b' : 'rgba(255,255,255,0.15)';
+        document.getElementById('penaltyLoseCard').style.background = type === 'lose_card' ? 'rgba(255,107,107,0.12)' : 'rgba(255,255,255,0.05)';
+        document.getElementById('penaltyMinusTwo').style.borderColor = type === 'minus_two' ? '#ff6b6b' : 'rgba(255,255,255,0.15)';
+        document.getElementById('penaltyMinusTwo').style.background = type === 'minus_two' ? 'rgba(255,107,107,0.12)' : 'rgba(255,255,255,0.05)';
     }
 
     function switchTab(tab) {
@@ -1461,6 +1707,7 @@
     state.round = room.current_round;
     state.instigatorVote = room.instigator_vote;
     state.instigatorVoteConfirmed = !!room.instigator_vote;
+    if (room.double_down_penalty) state.doubleDownPenalty = room.double_down_penalty;
         
     if (room.scores) state.scores = room.scores;
     
@@ -1568,7 +1815,8 @@
                 .update({ 
                     game_state: 'playing', 
                     current_reader: startingReader, 
-                    scores: scores, 
+                    scores: scores,
+                    double_down_penalty: state.doubleDownPenalty,
                     started_at: new Date().toISOString() 
                 })
                 .eq('id', roomId);
@@ -1593,12 +1841,10 @@
     console.log('Initializing game view...');
     console.log('Current user ID:', state.currentUser?.id);
     console.log('Current reader ID:', state.currentReader);
-    console.log('Match?', state.currentReader === state.currentUser?.id);
     
-    // Force a small delay to ensure state is synchronized
     setTimeout(() => {
-        const isReader = state.currentReader === state.currentUser?.id;
-        console.log('After delay - Is reader?', isReader);
+        const isInstigator = state.currentReader === state.currentUser?.id;
+        console.log('Is Instigator?', isInstigator);
         
         const readerView = document.getElementById('readerView');
         const voterView = document.getElementById('voterView');
@@ -1608,72 +1854,121 @@
             console.error('View elements not found!');
             return;
         }
-        
-        readerView.style.display = isReader ? 'block' : 'none';
-        voterView.style.display = isReader ? 'none' : 'block';
+
+        // Always hide results when initializing a fresh round
         resultsView.style.display = 'none';
         
-                if (isReader) {
+        if (isInstigator) {
             console.log('SHOWING INSTIGATOR VIEW');
+            readerView.style.display = 'block';
+            voterView.style.display = 'none';
+
+            // Update status bar
+            document.getElementById('instigatorStatusBar').textContent = '🎯 You are the Instigator';
+
             const questionCard = document.getElementById('readerQuestionCard');
             const drawBtn = document.getElementById('drawCardBtn');
             const revealBtn = document.getElementById('revealBtn');
             const nextRoundBtn = document.getElementById('nextRoundBtn');
-            
-            // Show player selection first
-            if (!state.instigatorVote) {
-                questionCard.innerHTML = '<div>Pick a player to vote for:</div>';
+
+            // Clean up any leftover pickers
+            document.getElementById('cardPicker')?.remove();
+            document.getElementById('instigatorPicker')?.remove();
+
+            if (!state.currentQuestion) {
+                // Step 1: Draw cards
+                questionCard.style.display = 'flex';
+                questionCard.textContent = 'Draw 3 cards to begin your round';
+                if (drawBtn) {
+                    drawBtn.textContent = '🃏 Draw Cards';
+                    drawBtn.disabled = false;
+                    drawBtn.onclick = drawCard;
+                    drawBtn.classList.remove('hidden');
+                }
+            } else if (!state.instigatorVoteConfirmed) {
+                // Step 2: Card picked, now choose a player
+                questionCard.style.display = 'flex';
+                questionCard.style.flexDirection = 'column';
+                questionCard.innerHTML = `<div style="color:#feca57;font-size:0.75rem;text-transform:uppercase;margin-bottom:10px;">📁 Question</div><div>${state.currentQuestion}</div>`;
                 showInstigatorVoteOptions();
                 if (drawBtn) {
                     drawBtn.textContent = 'Confirm Vote';
                     drawBtn.disabled = true;
+                    drawBtn.onclick = confirmInstigatorVote;
                     drawBtn.classList.remove('hidden');
                 }
             } else {
-                questionCard.textContent = 'Tap "Draw Card" to reveal question';
-                if (drawBtn) {
-                    drawBtn.textContent = 'Draw Card';
-                    drawBtn.disabled = false;
-                    drawBtn.classList.remove('hidden');
+                // Step 3: Vote confirmed, waiting for others
+                questionCard.style.display = 'flex';
+                questionCard.style.flexDirection = 'column';
+                questionCard.innerHTML = `<div style="color:#feca57;font-size:0.75rem;text-transform:uppercase;margin-bottom:10px;">📁 Question</div><div>${state.currentQuestion}</div>`;
+                document.getElementById('instigatorPicker')?.remove();
+                if (drawBtn) drawBtn.classList.add('hidden');
+                
+                // Check if all non-instigator players have voted
+                const voters = state.players.filter(p => p.id !== state.currentReader);
+                const allVoted = voters.length > 0 && voters.every(p => state.votes[p.id]);
+                if (allVoted) {
+                    revealBtn.classList.remove('hidden');
+                    showToast('Everyone voted! Reveal when ready.');
+                } else {
+                    revealBtn.classList.add('hidden');
                 }
             }
+
             if (revealBtn) revealBtn.classList.add('hidden');
             if (nextRoundBtn) nextRoundBtn.classList.add('hidden');
-            
             updateVotingStatus();
-                } else {
+
+        } else {
             console.log('SHOWING VOTER VIEW');
+            readerView.style.display = 'none';
+            voterView.style.display = 'block';
+
             const voterQuestion = document.getElementById('voterQuestionCard');
             const voterStatus = document.getElementById('voterStatus');
-            
-            // Check if question is available
+
             if (state.currentQuestion) {
                 voterQuestion.textContent = state.currentQuestion;
                 voterQuestion.classList.remove('waiting');
-                
-                // Check if instigator has voted
-                if (state.instigatorVoteConfirmed) {
-                    voterStatus.textContent = 'Vote now! Guess who the Instigator picked';
+
+                if (state.instigatorVoteConfirmed && !state.hasVoted) {
+                    voterStatus.textContent = 'Guess who the Instigator picked!';
                     voterStatus.classList.add('active');
                     document.getElementById('doubleDownSection').style.display = 'block';
                     document.getElementById('votingSection').style.display = 'block';
+                    document.getElementById('waitingSection').style.display = 'none';
+
+                    const ddBtn = document.getElementById('doubleDownBtn');
+                    if (state.currentUser?.double_down_used) {
+                        ddBtn.classList.add('used');
+                        ddBtn.disabled = true;
+                    } else {
+                        ddBtn.classList.remove('used', 'active');
+                        ddBtn.disabled = false;
+                    }
                     updateVoteOptions();
+                } else if (state.hasVoted) {
+                    voterStatus.textContent = 'Vote submitted! Waiting...';
+                    document.getElementById('doubleDownSection').style.display = 'none';
+                    document.getElementById('votingSection').style.display = 'none';
+                    document.getElementById('waitingSection').style.display = 'block';
                 } else {
-                    voterStatus.textContent = 'Instigator is choosing...';
+                    voterStatus.textContent = 'Instigator is choosing their player...';
                     voterStatus.classList.remove('active');
                     document.getElementById('doubleDownSection').style.display = 'none';
                     document.getElementById('votingSection').style.display = 'none';
+                    document.getElementById('waitingSection').style.display = 'none';
                 }
             } else {
                 voterQuestion.textContent = 'The Instigator is drawing a card...';
                 voterQuestion.classList.add('waiting');
-                voterStatus.textContent = 'Waiting for question...';
+                voterStatus.textContent = 'Waiting for Instigator...';
                 voterStatus.classList.remove('active');
                 document.getElementById('doubleDownSection').style.display = 'none';
                 document.getElementById('votingSection').style.display = 'none';
+                document.getElementById('waitingSection').style.display = 'none';
             }
-            
-            document.getElementById('waitingSection').style.display = 'none';
         }
         
         updateScoreboard();
@@ -1681,7 +1976,7 @@
     
     state.hasVoted = false;
 }
-            function showInstigatorVoteOptions() {
+    function showInstigatorVoteOptions() {
         // Remove existing picker if any
         let picker = document.getElementById('instigatorPicker');
         if (picker) picker.remove();
@@ -1689,22 +1984,25 @@
         picker = document.createElement('div');
         picker.id = 'instigatorPicker';
         picker.innerHTML = `
-            <h4 style="color: #feca57; margin: 20px 0 15px; text-align: center;">Pick who fits this card:</h4>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px;">
-                ${state.players.filter(p => p.id !== state.currentUser.id).map(p => `
-                    <div onclick="selectInstigatorVote('${p.id}')" 
-                         id="instigator-vote-${p.id}"
-                         style="background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); 
-                                border-radius: 15px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s;">
-                        <div style="font-size: 1.5rem; margin-bottom: 5px;">${p.name.charAt(0)}</div>
-                        <div style="font-weight: 600;">${p.name}</div>
-                    </div>
-                `).join('')}
+            <div class="card" style="margin-top: 15px;">
+                <h4 style="color: #feca57; margin-bottom: 5px; text-align: center;">🤫 Secretly pick a player</h4>
+                <p style="color: #a0a0a0; font-size: 0.8rem; text-align:center; margin-bottom: 14px;">You cannot pick yourself. Others will guess who you picked.</p>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                    ${state.players.filter(p => p.id !== state.currentUser.id).map(p => `
+                        <div onclick="selectInstigatorVote('${p.id}')" 
+                             id="instigator-vote-${p.id}"
+                             style="background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); 
+                                    border-radius: 14px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.2s;">
+                            <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(45deg,#ff6b6b,#feca57);display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:1.1rem;color:#1a1a2e;margin:0 auto 8px;">${p.name.charAt(0).toUpperCase()}</div>
+                            <div style="font-weight: 600; font-size: 0.9rem;">${p.name}</div>
+                        </div>
+                    `).join('')}
+                </div>
             </div>
         `;
         
-        const card = document.getElementById('readerQuestionCard');
-        card.parentNode.insertBefore(picker, card.nextSibling);
+        const actionButtons = document.querySelector('#readerView .action-buttons');
+        actionButtons.parentNode.insertBefore(picker, actionButtons.nextSibling);
     }
 
         function selectInstigatorVote(playerId) {
@@ -1729,7 +2027,6 @@
         showToast('Player selected! Tap Confirm to lock in');
     }
 
-    // ADD THE NEW FUNCTION HERE:
     async function confirmInstigatorVote() {
         if (!state.instigatorVote) return;
         
@@ -1738,16 +2035,22 @@
         
         const drawBtn = document.getElementById('drawCardBtn');
         drawBtn.classList.add('hidden');
+
+        document.getElementById('instigatorStatusBar').textContent = '🎯 Vote locked — waiting for everyone to vote...';
         
         const roomId = state.currentUser.room_id;
-        await supabaseClient
+        const { error } = await supabaseClient
             .from('rooms')
-            .update({ 
-                instigator_vote: state.instigatorVote 
-            })
+            .update({ instigator_vote: state.instigatorVote })
             .eq('id', roomId);
+
+        if (error) {
+            console.error('Failed to save instigator vote:', error);
+            showToast('Error saving vote: ' + error.message);
+            return;
+        }
         
-        showToast('Vote locked! Waiting for others...');
+        showToast('Vote locked in! 🤫 Waiting for players...');
         updateVotingStatus();
     }
         
@@ -1771,74 +2074,106 @@
     function updateGameView() {
         updateScoreboard();
         
-        const isReader = state.currentReader === state.currentUser?.id;
-        
-        if (state.currentQuestion) {
-            if (isReader) {
-                document.getElementById('readerQuestionCard').textContent = state.currentQuestion;
-                document.getElementById('drawCardBtn').classList.add('hidden');
-                
-                const voters = state.players.filter(p => p.id !== state.currentReader);
-                const allVoted = voters.every(p => state.votes[p.id]);
-                
-                const revealBtn = document.getElementById('revealBtn');
-                if (allVoted && revealBtn.classList.contains('hidden')) {
-                    revealBtn.classList.remove('hidden');
-                    showToast('Everyone voted!');
-                }
-                
-                updateVotingStatus();
-            } else if (!state.hasVoted) {
-                document.getElementById('voterQuestionCard').textContent = state.currentQuestion;
-                document.getElementById('voterQuestionCard').classList.remove('waiting');
-                document.getElementById('voterStatus').textContent = 'Vote now!';
-                document.getElementById('voterStatus').classList.add('active');
-                document.getElementById('doubleDownSection').style.display = 'block';
-                document.getElementById('votingSection').style.display = 'block';
-                
-                const ddBtn = document.getElementById('doubleDownBtn');
-                if (state.currentUser?.double_down_used) {
-                    ddBtn.classList.add('used');
-                    ddBtn.disabled = true;
-                } else {
-                    ddBtn.classList.remove('used', 'active');
-                    ddBtn.disabled = false;
-                }
-                
-                updateVoteOptions();
-            }
-        }
-        
+        const isInstigator = state.currentReader === state.currentUser?.id;
+
         if (state.gameState === 'results') {
             showResults();
+            return;
+        }
+        
+        if (state.currentQuestion) {
+            if (isInstigator) {
+                // Update question card
+                const qCard = document.getElementById('readerQuestionCard');
+                qCard.style.display = 'flex';
+                qCard.style.flexDirection = 'column';
+                qCard.innerHTML = `<div style="color:#feca57;font-size:0.75rem;text-transform:uppercase;margin-bottom:10px;">📁 Question</div><div>${state.currentQuestion}</div>`;
+                document.getElementById('drawCardBtn').classList.add('hidden');
+                document.getElementById('cardPicker')?.remove();
+                
+                if (state.instigatorVoteConfirmed) {
+                    // Waiting for voters — check if all voted
+                    document.getElementById('instigatorPicker')?.remove();
+                    const voters = state.players.filter(p => p.id !== state.currentReader);
+                    const allVoted = voters.length > 0 && voters.every(p => state.votes[p.id]);
+                    const revealBtn = document.getElementById('revealBtn');
+                    if (allVoted) {
+                        revealBtn.classList.remove('hidden');
+                        showToast('Everyone voted! Reveal when ready.');
+                    }
+                }
+                updateVotingStatus();
+            } else if (!state.hasVoted) {
+                if (state.instigatorVoteConfirmed) {
+                    document.getElementById('voterQuestionCard').textContent = state.currentQuestion;
+                    document.getElementById('voterQuestionCard').classList.remove('waiting');
+                    document.getElementById('voterStatus').textContent = 'Guess who the Instigator picked!';
+                    document.getElementById('voterStatus').classList.add('active');
+                    document.getElementById('doubleDownSection').style.display = 'block';
+                    document.getElementById('votingSection').style.display = 'block';
+                    document.getElementById('waitingSection').style.display = 'none';
+                    
+                    const ddBtn = document.getElementById('doubleDownBtn');
+                    if (state.currentUser?.double_down_used) {
+                        ddBtn.classList.add('used');
+                        ddBtn.disabled = true;
+                    } else {
+                        ddBtn.classList.remove('used', 'active');
+                        ddBtn.disabled = false;
+                    }
+                    updateVoteOptions();
+                } else {
+                    document.getElementById('voterQuestionCard').textContent = state.currentQuestion;
+                    document.getElementById('voterQuestionCard').classList.remove('waiting');
+                    document.getElementById('voterStatus').textContent = 'Instigator is choosing their player...';
+                    document.getElementById('voterStatus').classList.remove('active');
+                    document.getElementById('doubleDownSection').style.display = 'none';
+                    document.getElementById('votingSection').style.display = 'none';
+                }
+            }
         }
     }
 
     function updateVotingStatus() {
         const container = document.getElementById('votingStatus');
+        if (!container) return;
         const voters = state.players.filter(p => p.id !== state.currentReader);
         
         container.innerHTML = voters.map(p => {
-            const hasVoted = state.votes[p.id];
+            const hasVoted = !!state.votes[p.id];
             return `
                 <div class="player-card ${hasVoted ? 'voted' : ''}" style="padding: 8px;">
-                    <div class="player-avatar" style="width: 35px; height: 35px; font-size: 1rem;">${p.name.charAt(0)}</div>
-                    <div style="font-size: 0.7rem;">${hasVoted ? '✓' : '...'}</div>
+                    <div class="player-avatar" style="width: 35px; height: 35px; font-size: 1rem;">${p.name.charAt(0).toUpperCase()}</div>
+                    <div style="font-size: 0.7rem; margin-top: 3px;">${hasVoted ? '✅' : '⏳'}</div>
                 </div>
             `;
         }).join('');
+
+        // Auto-show reveal button when all non-instigator players have voted
+        if (state.instigatorVoteConfirmed && voters.length > 0) {
+            const allVoted = voters.every(p => state.votes[p.id]);
+            const revealBtn = document.getElementById('revealBtn');
+            if (revealBtn && allVoted) {
+                revealBtn.classList.remove('hidden');
+            }
+        }
     }
 
     function updateVoteOptions() {
         const container = document.getElementById('voteOptions');
-        const options = state.players.filter(p => p.id !== state.currentUser?.id && p.id !== state.currentReader);
+        // Voters guess who the Instigator picked — Instigator can't pick themselves,
+        // so valid targets are all players EXCEPT the instigator
+        const options = state.players.filter(p => p.id !== state.currentReader);
         
-        container.innerHTML = options.map(p => `
-            <div class="vote-option" onclick="submitVote('${p.id}')" id="vote-${p.id}">
-                <div style="font-size: 1.5rem; margin-bottom: 5px;">${p.name.charAt(0)}</div>
-                <div style="font-weight: 600;">${p.name}</div>
-            </div>
-        `).join('');
+        container.innerHTML = options.map(p => {
+            const isMe = p.id === state.currentUser?.id;
+            return `
+                <div class="vote-option" onclick="submitVote('${p.id}')" id="vote-${p.id}">
+                    <div style="font-size: 1.5rem; margin-bottom: 5px;">${p.name.charAt(0).toUpperCase()}</div>
+                    <div style="font-weight: 600;">${p.name}${isMe ? ' (You)' : ''}</div>
+                </div>
+            `;
+        }).join('');
     }
 
     function toggleDoubleDown() {
@@ -1904,6 +2239,9 @@
         }
     }
 
+    // Safe card data store — avoids escaping issues in onclick attrs
+    let _cardPickerData = [];
+
     function showSimpleCardPicker(cards, roomId) {
         const readerView = document.getElementById('readerView');
         const btn = document.getElementById('drawCardBtn');
@@ -1911,46 +2249,56 @@
         // Remove existing
         const existing = document.getElementById('cardPicker');
         if (existing) existing.remove();
+
+        // Store card data safely
+        _cardPickerData = cards.map(c => ({ ...c, roomId }));
         
-        // Create picker HTML
+        // Create picker with 3D flip cards
         const picker = document.createElement('div');
         picker.id = 'cardPicker';
+        picker.className = 'card-picker-wrapper';
         picker.innerHTML = `
-            <div style="text-align: center; margin-bottom: 20px;">
-                <h3 style="color: #feca57; margin-bottom: 15px;">🎴 Pick a Question</h3>
-                <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
-                    ${cards.map((card, i) => `
-                        <div onclick="selectCard('${card.id}', '${card.text.replace(/'/g, "\\'")}', '${(card.category || 'Question').replace(/'/g, "\\'")}', '${roomId}')"
-                             style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                                    border-radius: 15px;
-                                    padding: 20px;
-                                    width: 150px;
-                                    min-height: 180px;
-                                    cursor: pointer;
-                                    transition: all 0.2s;
-                                    border: 3px solid transparent;
-                                    display: flex;
-                                    flex-direction: column;
-                                    align-items: center;
-                                    justify-content: center;"
-                             onmouseover="this.style.transform='scale(1.05)'; this.style.borderColor='#feca57';"
-                             onmouseout="this.style.transform='scale(1)'; this.style.borderColor='transparent';">
-                            <div style="font-size: 2rem; margin-bottom: 10px;">🎴</div>
-                            <div style="color: #feca57; font-size: 0.7rem; text-transform: uppercase; margin-bottom: 5px;">${card.category || 'Question'}</div>
-                            <div style="color: #fff; font-size: 0.8rem; font-weight: bold;">Card ${i + 1}</div>
+            <div class="card-picker-title">🎴 Pick a Question Card</div>
+            <div class="cards-row">
+                ${cards.map((card, i) => `
+                    <div class="flip-card-container" id="flipcard-${i}" onclick="flipAndSelectCard(${i})">
+                        <div class="flip-card-inner">
+                            <div class="flip-card-front">
+                                <div class="card-emoji">🃏</div>
+                                <div class="card-category">${card.category || 'Question'}</div>
+                                <div class="card-label">Card ${i + 1}</div>
+                            </div>
+                            <div class="flip-card-back">
+                                <div class="card-category-back">${card.category || 'Question'}</div>
+                                <div class="card-question-text">${card.text}</div>
+                                <button class="pick-this-btn" onclick="event.stopPropagation(); actuallySelectCard(${i})">Pick This Card ✓</button>
+                            </div>
                         </div>
-                    `).join('')}
-                </div>
-                <p style="color: #a0a0a0; font-size: 0.85rem;">Tap a card to reveal the question</p>
+                    </div>
+                `).join('')}
             </div>
+            <p class="card-picker-hint">Tap a card to peek • Tap "Pick This Card" to choose</p>
         `;
         
-        readerView.insertBefore(picker, btn.parentNode);
+        // Insert before action buttons
+        const actionBtns = readerView.querySelector('.action-buttons');
+        readerView.insertBefore(picker, actionBtns);
+        
         document.getElementById('readerQuestionCard').style.display = 'none';
         btn.classList.add('hidden');
     }
 
-        async function selectCard(questionId, questionText, category, roomId) {
+    // Flip card on click (peek) — toggles flip
+    function flipAndSelectCard(cardIndex) {
+        const container = document.getElementById(`flipcard-${cardIndex}`);
+        if (!container) return;
+        container.classList.toggle('flipped');
+    }
+
+    async function actuallySelectCard(cardIndex) {
+        const data = _cardPickerData[cardIndex];
+        if (!data) return;
+        const { id: questionId, text: questionText, category, roomId } = data;
         console.log('Selected card:', category);
         
         try {
@@ -1962,12 +2310,12 @@
             card.style.display = 'flex';
             card.style.flexDirection = 'column';
             card.innerHTML = `
-                <div style="color: #feca57; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 10px;">📁 ${category}</div>
+                <div style="color: #feca57; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 10px;">📁 ${category || 'Question'}</div>
                 <div>${questionText}</div>
             `;
             
             // Mark used
-            if (questionId) {
+            if (questionId && !String(questionId).startsWith('default-')) {
                 await supabaseClient.from('used_questions').insert({
                     room_id: roomId,
                     question_id: questionId,
@@ -1975,18 +2323,19 @@
                 });
             }
             
-            // Update room with question
+            // Update room with question (NOT instigator_vote yet)
             await supabaseClient
                 .from('rooms')
                 .update({ current_question: questionText })
                 .eq('id', roomId);
             
-            // Now show player picker for Instigator
+            // Show player picker for Instigator
             showInstigatorVoteOptions();
             
             const drawBtn = document.getElementById('drawCardBtn');
             drawBtn.textContent = 'Confirm Vote';
             drawBtn.disabled = true;
+            drawBtn.onclick = confirmInstigatorVote;
             drawBtn.classList.remove('hidden');
             
         } catch (error) {
@@ -2047,46 +2396,63 @@
         
         try {
             const roomId = state.currentUser.room_id;
-            
-                        const instigatorTarget = state.instigatorVote;
+            const instigatorTarget = state.instigatorVote;
             const newScores = { ...state.scores };
-            
-            // Count who voted for what
-            const voteCounts = {};
-            Object.entries(state.votes).forEach(([voterId, vote]) => {
-                voteCounts[vote.target] = (voteCounts[vote.target] || 0) + 1;
-            });
-            
-            // Check if anyone matched Instigator
-            const matchers = Object.entries(state.votes).filter(([voterId, vote]) => vote.target === instigatorTarget);
-            
+            const penalty = state.doubleDownPenalty || 'lose_card';
+            let usedMajorityFallback = false;
+            let majorityTargetId = null;
+
+            // Count votes from non-instigator players
+            const voterEntries = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
+
+            // Who matched the instigator's pick?
+            const matchers = voterEntries.filter(([, vote]) => vote.target === instigatorTarget);
+
             if (matchers.length > 0) {
-                // Players who matched get points
+                // Matched players earn points
                 matchers.forEach(([voterId, vote]) => {
                     const points = vote.doubleDown ? 2 : 1;
                     newScores[voterId] = (newScores[voterId] || 0) + points;
                 });
-            } else {
-                // No one matched - majority gets 1 point
-                let maxVotes = 0;
-                let majority = null;
-                Object.entries(voteCounts).forEach(([target, count]) => {
-                    if (count > maxVotes) {
-                        maxVotes = count;
-                        majority = target;
+                // Wrong Double-Downers: apply penalty
+                voterEntries.filter(([, vote]) => vote.doubleDown && vote.target !== instigatorTarget).forEach(([voterId]) => {
+                    if (penalty === 'minus_two') {
+                        newScores[voterId] = (newScores[voterId] || 0) - 2;
                     }
+                    // 'lose_card' = no point change, they just lose the card (already marked used in DB)
                 });
-                Object.entries(state.votes).forEach(([voterId, vote]) => {
-                    if (vote.target === majority) {
-                        newScores[voterId] = (newScores[voterId] || 0) + 1;
+            } else {
+                // Nobody matched — fall back to majority vote
+                usedMajorityFallback = true;
+                const voteCounts = {};
+                voterEntries.forEach(([, vote]) => {
+                    voteCounts[vote.target] = (voteCounts[vote.target] || 0) + 1;
+                });
+                let maxVotes = 0;
+                Object.entries(voteCounts).forEach(([target, count]) => {
+                    if (count > maxVotes) { maxVotes = count; majorityTargetId = target; }
+                });
+                voterEntries.forEach(([voterId, vote]) => {
+                    if (vote.target === majorityTargetId) {
+                        newScores[voterId] = (newScores[voterId] || 0) + (vote.doubleDown ? 2 : 1);
+                    } else if (vote.doubleDown && penalty === 'minus_two') {
+                        newScores[voterId] = (newScores[voterId] || 0) - 2;
                     }
                 });
             }
-            // Instigator never gets points
-            
+
+            // Instigator NEVER earns points — reset their score for this round if changed
+            // (they start the round without being allowed to score)
+            // No-op needed: instigator is excluded from voterEntries above.
+
             const { error } = await supabaseClient
                 .from('rooms')
-                .update({ game_state: 'results', scores: newScores, last_majority: majority })
+                .update({
+                    game_state: 'results',
+                    scores: newScores,
+                    last_majority: majorityTargetId,
+                    majority_fallback: usedMajorityFallback
+                })
                 .eq('id', roomId);
             
             if (error) throw error;
@@ -2095,7 +2461,7 @@
             console.error('Reveal error:', error);
             showToast('Failed to reveal: ' + error.message);
             btn.disabled = false;
-            btn.textContent = 'Reveal Votes';
+            btn.textContent = '🎉 Reveal Votes';
         }
     }
 
@@ -2104,39 +2470,97 @@
         document.getElementById('voterView').style.display = 'none';
         document.getElementById('resultsView').style.display = 'block';
         
-        document.getElementById('resultQuestion').textContent = state.currentQuestion;
-        
-        const majority = state.players.find(p => {
-            const count = Object.values(state.votes).filter(v => v.target === p.id).length;
-            return count === Math.max(...Object.values(state.votes).map(v => 
-                Object.values(state.votes).filter(v2 => v2.target === v.target).length
-            ));
-        });
-        
-        document.getElementById('majorityTarget').textContent = majority?.name || 'No one';
-        
+        document.getElementById('resultQuestion').textContent = state.currentQuestion || '';
+
+        // Show who instigator actually picked
+        const instigatorPlayer = state.players.find(p => p.id === state.currentReader);
+        const pickedPlayer = state.players.find(p => p.id === state.instigatorVote);
+        document.getElementById('instigatorPickDisplay').textContent =
+            pickedPlayer ? pickedPlayer.name : '???';
+
+        // Non-instigator votes
+        const voterEntries = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
+        const instigatorTarget = state.instigatorVote;
+
+        // Did anyone match?
+        const anyMatched = voterEntries.some(([, v]) => v.target === instigatorTarget);
+
+        // Majority fallback
+        let majorityTargetId = null;
+        if (!anyMatched) {
+            const voteCounts = {};
+            voterEntries.forEach(([, v]) => { voteCounts[v.target] = (voteCounts[v.target] || 0) + 1; });
+            let maxVotes = 0;
+            Object.entries(voteCounts).forEach(([target, count]) => {
+                if (count > maxVotes) { maxVotes = count; majorityTargetId = target; }
+            });
+            const majorityCard = document.getElementById('majorityFallbackCard');
+            const majorityName = state.players.find(p => p.id === majorityTargetId)?.name || '?';
+            majorityCard.style.display = 'block';
+            document.getElementById('majorityTarget').textContent = majorityName;
+        } else {
+            const majorityCard = document.getElementById('majorityFallbackCard');
+            if (majorityCard) majorityCard.style.display = 'none';
+        }
+
+        const penalty = state.doubleDownPenalty || 'lose_card';
         const list = document.getElementById('resultsList');
-        const voters = Object.keys(state.votes);
-        
-        list.innerHTML = voters.map(voterId => {
+        const instigatorId = state.currentReader;
+
+        // Build results list — show instigator first (no points), then voters
+        let rows = [];
+
+        // Instigator row
+        if (instigatorPlayer) {
+            rows.push(`
+                <div class="result-item" style="border-left-color: #feca57; opacity: 0.7;">
+                    <div>
+                        <div class="voter-name">🎯 ${instigatorPlayer.name} <span style="font-size:0.7rem;color:#feca57;">(Instigator)</span></div>
+                        <div class="voted-for">picked ${pickedPlayer?.name || '?'}</div>
+                    </div>
+                    <div style="color:#a0a0a0; font-size:0.9rem;">No pts</div>
+                </div>
+            `);
+        }
+
+        // Voter rows
+        voterEntries.forEach(([voterId, vote]) => {
             const voter = state.players.find(p => p.id === voterId);
-            const vote = state.votes[voterId];
             const target = state.players.find(p => p.id === vote.target);
-            const correct = vote.target === majority?.id;
-            const points = correct ? (vote.doubleDown ? 2 : 1) : 0;
-            
-            return `
+            let correct, points, penaltyText = '';
+
+            if (anyMatched) {
+                correct = vote.target === instigatorTarget;
+                points = correct ? (vote.doubleDown ? 2 : 1) : 0;
+                if (!correct && vote.doubleDown) {
+                    penaltyText = penalty === 'minus_two' ? '💀 -2 pts penalty' : '🃏 Lost Double Down';
+                    points = penalty === 'minus_two' ? -2 : 0;
+                }
+            } else {
+                // Majority fallback
+                correct = vote.target === majorityTargetId;
+                points = correct ? (vote.doubleDown ? 2 : 1) : 0;
+                if (!correct && vote.doubleDown) {
+                    penaltyText = penalty === 'minus_two' ? '💀 -2 pts penalty' : '🃏 Lost Double Down';
+                    points = penalty === 'minus_two' ? -2 : 0;
+                }
+            }
+
+            rows.push(`
                 <div class="result-item ${correct ? 'correct' : 'wrong'}">
                     <div>
                         <div class="voter-name">${voter?.name || 'Unknown'}</div>
-                        <div class="voted-for">voted for ${target?.name || 'Unknown'}</div>
-                        ${vote.doubleDown ? '<div style="color: #f5576c; font-size: 0.75rem; margin-top: 2px;">🚀 Double Down</div>' : ''}
+                        <div class="voted-for">guessed → ${target?.name || 'Unknown'}</div>
+                        ${vote.doubleDown ? `<div style="color: #f5576c; font-size: 0.75rem; margin-top: 2px;">🚀 Double Down${penaltyText ? ' · ' + penaltyText : ''}</div>` : (penaltyText ? `<div style="color:#ff4757;font-size:0.75rem;">${penaltyText}</div>` : '')}
                     </div>
-                    <div class="points-earned">${correct ? '+' + points : '0'}</div>
+                    <div class="points-earned" style="color:${points > 0 ? '#2ecc71' : points < 0 ? '#ff4757' : '#a0a0a0'}">
+                        ${points > 0 ? '+' + points : points < 0 ? points : '0'}
+                    </div>
                 </div>
-            `;
-        }).join('');
-        
+            `);
+        });
+
+        list.innerHTML = rows.join('');
         updateScoreboard();
     }
 
@@ -2157,6 +2581,13 @@
             const nextIdx = (currentIdx + 1) % state.players.length;
             const nextReader = state.players[nextIdx]?.id;
             
+            // Delete old votes first
+            await supabaseClient
+                .from('votes')
+                .delete()
+                .eq('room_id', roomId)
+                .eq('round', state.round);
+
             const { error } = await supabaseClient
                 .from('rooms')
                 .update({
@@ -2164,21 +2595,18 @@
                     current_question: null,
                     current_reader: nextReader,
                     current_round: state.round + 1,
-                    last_majority: null
+                    last_majority: null,
+                    majority_fallback: false,
+                    instigator_vote: null
                 })
                 .eq('id', roomId);
-
-            // Reset instigator vote for next round
-            state.instigatorVote = null;
-            state.instigatorVoteConfirmed = false;
-            
-            await supabaseClient
-                .from('votes')
-                .delete()
-                .eq('room_id', roomId)
-                .eq('round', state.round);
             
             if (error) throw error;
+
+            // Reset local instigator state
+            state.instigatorVote = null;
+            state.instigatorVoteConfirmed = false;
+            state.hasVoted = false;
             
             document.getElementById('continueBtn').textContent = 'Continue';
             document.getElementById('continueBtn').disabled = false;
