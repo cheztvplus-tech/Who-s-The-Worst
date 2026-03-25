@@ -1244,8 +1244,12 @@
                     Continue
                 </button>
             </div>
-        </div>
+        
+            <button class="btn-secondary" onclick="confirmLeaveRoom()" style="margin-top: 20px; opacity: 0.8;">
+                🚪 Leave Room
+            </button>
 
+        </div>
         <!-- Winner Screen -->
         <div id="winnerScreen" class="screen">
             <div class="winner-display">
@@ -2740,6 +2744,12 @@
         showScreen('joinScreen');
         document.getElementById('usernameInput').value = '';
         document.getElementById('roomCodeInput').value = '';
+    }
+
+        function confirmLeaveRoom() {
+        if (confirm('Are you sure you want to leave the game?')) {
+            leaveRoom();
+        }
     }
 
     function playAgain() {
