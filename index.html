@@ -1756,6 +1756,10 @@
         round: room.current_round
     });
     
+    // Check if we're transitioning to a new round before updating state
+    const isNewRound = room.game_state === 'playing' && !room.current_question && state.currentQuestion;
+    const wasResults = state.gameState === 'results';
+    
     state.gameState = room.game_state;
     state.currentQuestion = room.current_question;
     state.currentReader = room.current_reader;
@@ -1772,7 +1776,6 @@
             console.log('Switching to game screen');
             showScreen('gameScreen');
             
-            // CRITICAL: Wait for DOM update then initialize view
             setTimeout(() => {
                 console.log('Initializing game view after delay');
                 console.log('Current user ID:', state.currentUser?.id);
@@ -1781,8 +1784,17 @@
                 initGameView();
             }, 100);
         } else {
-            // Already on game screen, just update
-            updateGameView();
+            // Already on game screen
+            if (state.gameState === 'results') {
+                showResults();
+            } else if (isNewRound || wasResults) {
+                // NEW ROUND: Reset views properly
+                console.log('New round detected - reinitializing game view');
+                initGameView();
+            } else {
+                // Same round, just update
+                updateGameView();
+            }
         }
     }
     
