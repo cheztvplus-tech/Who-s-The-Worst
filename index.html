@@ -1714,20 +1714,19 @@
     // If game is playing or results, switch to game screen
     if (state.gameState === 'playing' || state.gameState === 'results') {
         if (document.getElementById('lobbyScreen').classList.contains('active')) {
-            console.log('Switching to game screen');
+            console.log('Switching to game screen from lobby');
             showScreen('gameScreen');
-            
-            // CRITICAL: Wait for DOM update then initialize view
-            setTimeout(() => {
-                console.log('Initializing game view after delay');
-                console.log('Current user ID:', state.currentUser?.id);
-                console.log('Current reader ID:', state.currentReader);
-                console.log('Are they equal?', state.currentReader === state.currentUser?.id);
+            setTimeout(() => initGameView(), 100);
+        } else if (document.getElementById('gameScreen').classList.contains('active')) {
+            if (state.gameState === 'results') {
+                // Show results within game screen
+                updateGameView();
+            } else {
+                // game_state flipped back to 'playing' = new round starting
+                console.log('New round starting, reinitializing game view');
+                state.hasVoted = false;
                 initGameView();
-            }, 100);
-        } else {
-            // Already on game screen, just update
-            updateGameView();
+            }
         }
     }
     
