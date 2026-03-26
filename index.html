@@ -1354,13 +1354,13 @@
         <div class="rules-content" onclick="event.stopPropagation()">
             <h3>📋 How to Play</h3>
             <ol>
-                <li><strong>The Instigator</strong> silently chooses one player and places their vote face down.</li>
+                <li><strong>The Instigator</strong> silently chooses one player and places their vote.</li>
                 <li>The Instigator <strong>cannot vote for themselves</strong>.</li>
-                <li>Other players vote by guessing who the Instigator chose, not who they'd personally pick.</li>
-                <li>Reveal votes one-by-one, starting left of Instigator. Instigator reveals last.</li>
+                <li>Other players vote by guessing who they believe the Instigator chose, not who they'd personally pick.</li>
+                <li>Once everyone has voted, the Instigator reveals all votes.</li>
                 <li>Players matching the Instigator's vote get <strong>1 point</strong>.</li>
-                <li>If Instigator picked someone no one else chose, the <strong>majority vote</strong> gets 1 point instead. Instigator gets no points.</li>
-                <li><strong>Double Down:</strong> Use once per game. Correct = 2 points, Wrong = lose card (or -2 points if host chooses).</li>
+                <li>If nobody guesses correctly, the <strong>majority vote</strong> gets 1 point AND the <strong>Instigator</strong> also gets 1 point.</li>
+                <li><strong>Double Down:</strong> Use once per game (or every round if host allows). Correct = 2 points, Wrong = lose card (or -2 pts in harsh mode).</li>
                 <li>Next round: New Instigator goes round-robin.</li>
             </ol>
             <button class="btn-secondary close-rules" onclick="hideRules()">Got it</button>
