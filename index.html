@@ -1425,14 +1425,13 @@
         initSupabase();
     };
 
-    async function initSupabase() {
+   async function initSupabase() {
     try {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
             realtime: {
                 params: {
                     eventsPerSecond: 10,
                 },
-                // Add heartbeat to detect disconnections
                 timeout: 20000,
             }
         });
@@ -1446,15 +1445,23 @@
         supabaseClient.realtime.onClose(() => {
             console.log('Realtime connection closed');
             updateConnectionStatus(false);
-            // Attempt reconnection
             setTimeout(initSupabase, 1000);
         });
         
-        // ... rest of init
+        const { error } = await supabaseClient.from('rooms').select('count', { count: 'exact', head: true });
+        if (error && error.code !== 'PGRST116') throw error;
+        
+        updateConnectionStatus(true);
+        await loadQuestionsFromSupabase();
+        const restored = await tryRestoreSession();
+        if (!restored) {
+            showScreen('joinScreen');
+            showToast(`Connected! ${CONFIG.QUESTIONS.length} questions ready`);
+        }
+        
     } catch (error) {
         console.error('Connection error:', error);
         updateConnectionStatus(false);
-        // Retry connection
         setTimeout(initSupabase, 3000);
     }
 }
