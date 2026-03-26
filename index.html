@@ -1320,7 +1320,7 @@
 
                 <div class="results-container" id="resultsList"></div>
 
-                <div class="card" style="text-align: center; margin-bottom: 15px;" id="majorityFallbackCard" style="display:none;">
+                <div class="card" style="text-align: center; margin-bottom: 15px; display: none;" id="majorityFallbackCard">
                     <h4 style="color: #feca57; margin-bottom: 10px; font-size: 0.85rem;">Nobody matched — majority vote wins:</h4>
                     <div id="majorityTarget" style="font-size: 1.4rem; font-weight: bold; color: #2ecc71;"></div>
                 </div>
@@ -2132,7 +2132,10 @@
         updateScoreboard();
     }, 200);
     
-    state.hasVoted = false;
+    // Only reset hasVoted when starting a fresh round (no question yet)
+    if (!state.currentQuestion) {
+        state.hasVoted = false;
+    }
 }
     function showInstigatorVoteOptions() {
         // Remove existing picker if any
@@ -2259,6 +2262,8 @@
                     if (allVoted) {
                         revealBtn.classList.remove('hidden');
                         showToast('Everyone voted! Reveal when ready.');
+                    } else {
+                        revealBtn.classList.add('hidden');
                     }
                 }
                 updateVotingStatus();
@@ -2715,16 +2720,18 @@
                 correct = vote.target === instigatorTarget;
                 points = correct ? (vote.doubleDown ? 2 : 1) : 0;
                 if (!correct && vote.doubleDown) {
-                    penaltyText = penalty === 'minus_two' ? '💀 -2 pts penalty' : '🃏 Lost Double Down';
-                    points = penalty === 'minus_two' ? -2 : 0;
+                    if (penalty === 'minus_two') { penaltyText = '💀 -2 pts penalty'; points = -2; }
+                    else if (penalty === 'reusable') { penaltyText = '♻️ Card lost'; points = 0; }
+                    else { penaltyText = '🃏 Lost Double Down'; points = 0; }
                 }
             } else {
                 // Majority fallback
                 correct = vote.target === majorityTargetId;
                 points = correct ? (vote.doubleDown ? 2 : 1) : 0;
                 if (!correct && vote.doubleDown) {
-                    penaltyText = penalty === 'minus_two' ? '💀 -2 pts penalty' : '🃏 Lost Double Down';
-                    points = penalty === 'minus_two' ? -2 : 0;
+                    if (penalty === 'minus_two') { penaltyText = '💀 -2 pts penalty'; points = -2; }
+                    else if (penalty === 'reusable') { penaltyText = '♻️ Card lost'; points = 0; }
+                    else { penaltyText = '🃏 Lost Double Down'; points = 0; }
                 }
             }
 
