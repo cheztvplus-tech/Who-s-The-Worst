@@ -2563,6 +2563,12 @@
             showToast('Failed to vote: ' + error.message);
             state.hasVoted = false;
         }
+            
+        } catch (error) {
+            console.error('Vote error:', error);
+            showToast('Failed to vote: ' + error.message);
+            state.hasVoted = false;
+        }
     }
 
     async function revealVotes() {
