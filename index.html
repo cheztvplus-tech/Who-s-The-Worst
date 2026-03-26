@@ -2536,58 +2536,50 @@
     }
 
     async function submitVote(targetId) {
-        if (state.hasVoted) return;
+    if (state.hasVoted) return;
 
-        if (!state.instigatorVoteConfirmed && state.currentReader !== state.currentUser?.id) {
-            showToast('Wait for the Instigator to vote first!');
-            return;
-        }
-        
-        const card = document.getElementById('pokerCard');
-        const doubleDown = card ? card.classList.contains('active-card') : false;
-        
-        document.querySelectorAll('.vote-option').forEach(el => el.classList.remove('selected'));
-        document.getElementById(`vote-${targetId}`).classList.add('selected');
-        
-        try {
-            const { error } = await supabaseClient
-                .from('votes')
-                .insert({
-                    room_id: state.currentUser.room_id,
-                    player_id: state.currentUser.id,
-                    target_id: targetId,
-                    round: state.round,
-                    double_down: doubleDown
-                });
-            
-            if (error) throw error;
-            
-            // For 'lose_card' and 'minus_two': mark as used permanently
-            // For 'reusable': only mark used if they win (handled at reveal); here just flag it was used this round
-            if (doubleDown && state.doubleDownPenalty !== 'reusable') {
-                await supabaseClient
-                    .from('players')
-                    .update({ double_down_used: true })
-                    .eq('id', state.currentUser.id);
-            }
-            
-            state.hasVoted = true;
-            document.getElementById('votingSection').style.display = 'none';
-            document.getElementById('waitingSection').style.display = 'block';
-            document.getElementById('voterStatus').textContent = 'Vote submitted!';
-            
-        } catch (error) {
-            console.error('Vote error:', error);
-            showToast('Failed to vote: ' + error.message);
-            state.hasVoted = false;
-        }
-            
-        } catch (error) {
-            console.error('Vote error:', error);
-            showToast('Failed to vote: ' + error.message);
-            state.hasVoted = false;
-        }
+    if (!state.instigatorVoteConfirmed && state.currentReader !== state.currentUser?.id) {
+        showToast('Wait for the Instigator to vote first!');
+        return;
     }
+    
+    const card = document.getElementById('pokerCard');
+    const doubleDown = card ? card.classList.contains('active-card') : false;
+    
+    document.querySelectorAll('.vote-option').forEach(el => el.classList.remove('selected'));
+    document.getElementById(`vote-${targetId}`).classList.add('selected');
+    
+    try {
+        const { error } = await supabaseClient
+            .from('votes')
+            .insert({
+                room_id: state.currentUser.room_id,
+                player_id: state.currentUser.id,
+                target_id: targetId,
+                round: state.round,
+                double_down: doubleDown
+            });
+        
+        if (error) throw error;
+        
+        if (doubleDown && state.doubleDownPenalty !== 'reusable') {
+            await supabaseClient
+                .from('players')
+                .update({ double_down_used: true })
+                .eq('id', state.currentUser.id);
+        }
+        
+        state.hasVoted = true;
+        document.getElementById('votingSection').style.display = 'none';
+        document.getElementById('waitingSection').style.display = 'block';
+        document.getElementById('voterStatus').textContent = 'Vote submitted!';
+        
+    } catch (error) {
+        console.error('Vote error:', error);
+        showToast('Failed to vote: ' + error.message);
+        state.hasVoted = false;
+    }
+}
 
     async function revealVotes() {
     const btn = document.getElementById('revealBtn');
