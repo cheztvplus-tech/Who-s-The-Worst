@@ -1425,46 +1425,25 @@
         initSupabase();
     };
 
-   async function initSupabase() {
-    try {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-            realtime: {
-                params: {
-                    eventsPerSecond: 10,
-                },
-                timeout: 20000,
-            }
-        });
-        
-        // Add connection state monitoring
-        supabaseClient.realtime.onOpen(() => {
-            console.log('Realtime connection opened');
+    async function initSupabase() {
+        try {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            const { error } = await supabaseClient.from('rooms').select('count', { count: 'exact', head: true });
+            if (error && error.code !== 'PGRST116') throw error;
             updateConnectionStatus(true);
-        });
-        
-        supabaseClient.realtime.onClose(() => {
-            console.log('Realtime connection closed');
+            await loadQuestionsFromSupabase();
+            const restored = await tryRestoreSession();
+            if (!restored) {
+                showScreen('joinScreen');
+                showToast(`Connected! ${CONFIG.QUESTIONS.length} questions ready`);
+            }
+        } catch (error) {
+            console.error('Connection error:', error);
             updateConnectionStatus(false);
-            setTimeout(initSupabase, 1000);
-        });
-        
-        const { error } = await supabaseClient.from('rooms').select('count', { count: 'exact', head: true });
-        if (error && error.code !== 'PGRST116') throw error;
-        
-        updateConnectionStatus(true);
-        await loadQuestionsFromSupabase();
-        const restored = await tryRestoreSession();
-        if (!restored) {
             showScreen('joinScreen');
-            showToast(`Connected! ${CONFIG.QUESTIONS.length} questions ready`);
+            showToast('Connection failed. Check console.');
         }
-        
-    } catch (error) {
-        console.error('Connection error:', error);
-        updateConnectionStatus(false);
-        setTimeout(initSupabase, 3000);
     }
-}
 
     // ==========================================
     // SESSION PERSISTENCE (survive refresh)
@@ -1864,48 +1843,51 @@
     function handleRoomChange(room) {
     if (!room) return;
     
-    console.log('Handling room change:', room.game_state);
-    
-    // Prevent processing duplicate states
-    if (state.gameState === room.game_state && 
-        state.currentQuestion === room.current_question &&
-        state.round === room.current_round) {
-        console.log('Duplicate state, ignoring');
-        return;
-    }
-    
-    // Batch state updates
-    const updates = {
-        gameState: room.game_state,
-        currentQuestion: room.current_question,
+    console.log('Handling room change:', { 
+        gameState: room.game_state, 
         currentReader: room.current_reader,
-        round: room.current_round,
-        instigatorVote: room.instigator_vote,
-        instigatorVoteConfirmed: !!room.instigator_vote,
-        scores: room.scores || state.scores
-    };
+        currentQuestion: room.current_question,
+        round: room.current_round
+    });
     
-    if (room.double_down_penalty) updates.doubleDownPenalty = room.double_down_penalty;
+    // Check if we're transitioning to a new round before updating state
+    const isNewRound = room.game_state === 'playing' && !room.current_question && state.currentQuestion;
+    const wasResults = state.gameState === 'results';
     
-    // Apply all updates at once
-    Object.assign(state, updates);
-    
-    // Handle view transitions
-    if (state.gameState === 'playing' || state.gameState === 'results') {
-        const isNewScreen = !document.getElementById('gameScreen').classList.contains('active');
+    state.gameState = room.game_state;
+    state.currentQuestion = room.current_question;
+    state.currentReader = room.current_reader;
+    state.round = room.current_round;
+    state.instigatorVote = room.instigator_vote;
+    state.instigatorVoteConfirmed = !!room.instigator_vote;
+    if (room.double_down_penalty) state.doubleDownPenalty = room.double_down_penalty;
         
-        if (isNewScreen) {
+    if (room.scores) state.scores = room.scores;
+    
+    // If game is playing or results, switch to game screen
+    if (state.gameState === 'playing' || state.gameState === 'results') {
+        if (document.getElementById('lobbyScreen').classList.contains('active')) {
+            console.log('Switching to game screen');
             showScreen('gameScreen');
-            // Delay init to ensure DOM is ready
-            requestAnimationFrame(() => {
-                setTimeout(initGameView, 50);
-            });
+            
+            setTimeout(() => {
+                console.log('Initializing game view after delay');
+                console.log('Current user ID:', state.currentUser?.id);
+                console.log('Current reader ID:', state.currentReader);
+                console.log('Are they equal?', state.currentReader === state.currentUser?.id);
+                initGameView();
+            }, 100);
         } else {
             // Already on game screen
             if (state.gameState === 'results') {
                 showResults();
-            } else {
+            } else if (isNewRound || wasResults) {
+                // NEW ROUND: Reset views properly
+                console.log('New round detected - reinitializing game view');
                 initGameView();
+            } else {
+                // Same round, just update
+                updateGameView();
             }
         }
     }
@@ -2536,126 +2518,116 @@
     }
 
     async function submitVote(targetId) {
-    if (state.hasVoted) return;
+        if (state.hasVoted) return;
 
-    if (!state.instigatorVoteConfirmed && state.currentReader !== state.currentUser?.id) {
-        showToast('Wait for the Instigator to vote first!');
-        return;
-    }
-    
-    const card = document.getElementById('pokerCard');
-    const doubleDown = card ? card.classList.contains('active-card') : false;
-    
-    document.querySelectorAll('.vote-option').forEach(el => el.classList.remove('selected'));
-    document.getElementById(`vote-${targetId}`).classList.add('selected');
-    
-    try {
-        const { error } = await supabaseClient
-            .from('votes')
-            .insert({
-                room_id: state.currentUser.room_id,
-                player_id: state.currentUser.id,
-                target_id: targetId,
-                round: state.round,
-                double_down: doubleDown
-            });
-        
-        if (error) throw error;
-        
-        if (doubleDown && state.doubleDownPenalty !== 'reusable') {
-            await supabaseClient
-                .from('players')
-                .update({ double_down_used: true })
-                .eq('id', state.currentUser.id);
+        if (!state.instigatorVoteConfirmed && state.currentReader !== state.currentUser?.id) {
+            showToast('Wait for the Instigator to vote first!');
+            return;
         }
         
-        state.hasVoted = true;
-        document.getElementById('votingSection').style.display = 'none';
-        document.getElementById('waitingSection').style.display = 'block';
-        document.getElementById('voterStatus').textContent = 'Vote submitted!';
+        const card = document.getElementById('pokerCard');
+        const doubleDown = card ? card.classList.contains('active-card') : false;
         
-    } catch (error) {
-        console.error('Vote error:', error);
-        showToast('Failed to vote: ' + error.message);
-        state.hasVoted = false;
+        document.querySelectorAll('.vote-option').forEach(el => el.classList.remove('selected'));
+        document.getElementById(`vote-${targetId}`).classList.add('selected');
+        
+        try {
+            const { error } = await supabaseClient
+                .from('votes')
+                .insert({
+                    room_id: state.currentUser.room_id,
+                    player_id: state.currentUser.id,
+                    target_id: targetId,
+                    round: state.round,
+                    double_down: doubleDown
+                });
+            
+            if (error) throw error;
+            
+            // For 'lose_card' and 'minus_two': mark as used permanently
+            // For 'reusable': only mark used if they win (handled at reveal); here just flag it was used this round
+            if (doubleDown && state.doubleDownPenalty !== 'reusable') {
+                await supabaseClient
+                    .from('players')
+                    .update({ double_down_used: true })
+                    .eq('id', state.currentUser.id);
+            }
+            
+            state.hasVoted = true;
+            document.getElementById('votingSection').style.display = 'none';
+            document.getElementById('waitingSection').style.display = 'block';
+            document.getElementById('voterStatus').textContent = 'Vote submitted!';
+            
+        } catch (error) {
+            console.error('Vote error:', error);
+            showToast('Failed to vote: ' + error.message);
+            state.hasVoted = false;
+        }
     }
-}
 
     async function revealVotes() {
-    const btn = document.getElementById('revealBtn');
-    btn.disabled = true;
-    btn.textContent = 'Revealing...';
-    
-    try {
-        const roomId = state.currentUser.room_id;
-        const instigatorTarget = state.instigatorVote;
-        const newScores = { ...state.scores };
-        const penalty = state.doubleDownPenalty || 'lose_card';
-        let usedMajorityFallback = false;
-        let majorityTargetId = null;
+        const btn = document.getElementById('revealBtn');
+        btn.disabled = true;
+        btn.textContent = 'Revealing...';
+        
+        try {
+            const roomId = state.currentUser.room_id;
+            const instigatorTarget = state.instigatorVote;
+            const newScores = { ...state.scores };
+            const penalty = state.doubleDownPenalty || 'lose_card';
+            let usedMajorityFallback = false;
+            let majorityTargetId = null;
 
-        const voterEntries = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
-        const matchers = voterEntries.filter(([, vote]) => vote.target === instigatorTarget);
-        const wrongDoubleDowners = voterEntries.filter(([, vote]) => vote.doubleDown && vote.target !== instigatorTarget);
+            // Count votes from non-instigator players
+            const voterEntries = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
 
-        if (matchers.length > 0) {
-            matchers.forEach(([voterId, vote]) => {
-                const points = vote.doubleDown ? 2 : 1;
-                newScores[voterId] = (newScores[voterId] || 0) + points;
-            });
-            
-            // FIX: Properly await all penalty updates
-            if (wrongDoubleDowners.length > 0) {
-                const penaltyPromises = wrongDoubleDowners.map(async ([voterId]) => {
+            // Who matched the instigator's pick?
+            const matchers = voterEntries.filter(([, vote]) => vote.target === instigatorTarget);
+            // Players who doubled down but were wrong
+            const wrongDoubleDowners = voterEntries.filter(([, vote]) => vote.doubleDown && vote.target !== instigatorTarget);
+
+            if (matchers.length > 0) {
+                // Matched players earn points
+                matchers.forEach(([voterId, vote]) => {
+                    const points = vote.doubleDown ? 2 : 1;
+                    newScores[voterId] = (newScores[voterId] || 0) + points;
+                });
+                // Wrong Double-Downers: apply penalty
+                wrongDoubleDowners.forEach(([voterId]) => {
                     if (penalty === 'minus_two') {
                         newScores[voterId] = (newScores[voterId] || 0) - 2;
                     }
+                    // 'lose_card': no point change, card already marked used
+                    // 'reusable': mark card as used (burned on wrong guess)
                     if (penalty === 'reusable') {
-                        const { error } = await supabaseClient
-                            .from('players')
-                            .update({ double_down_used: true })
-                            .eq('id', voterId);
-                        if (error) console.error('Failed to mark double down used:', error);
+                        supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
                     }
                 });
-                await Promise.all(penaltyPromises);
+            } else {
+                // Nobody matched — fall back to majority vote
+                usedMajorityFallback = true;
+                const voteCounts = {};
+                voterEntries.forEach(([, vote]) => {
+                    voteCounts[vote.target] = (voteCounts[vote.target] || 0) + 1;
+                });
+                let maxVotes = 0;
+                Object.entries(voteCounts).forEach(([target, count]) => {
+                    if (count > maxVotes) { maxVotes = count; majorityTargetId = target; }
+                });
+                voterEntries.forEach(([voterId, vote]) => {
+                    if (vote.target === majorityTargetId) {
+                        newScores[voterId] = (newScores[voterId] || 0) + (vote.doubleDown ? 2 : 1);
+                    } else if (vote.doubleDown) {
+                        if (penalty === 'minus_two') {
+                            newScores[voterId] = (newScores[voterId] || 0) - 2;
+                        }
+                        if (penalty === 'reusable') {
+                            supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
+                        }
+                    }
+                });
             }
-        } else {
-            usedMajorityFallback = true;
-            const voteCounts = {};
-            voterEntries.forEach(([, vote]) => {
-                voteCounts[vote.target] = (voteCounts[vote.target] || 0) + 1;
-            });
-            let maxVotes = 0;
-            Object.entries(voteCounts).forEach(([target, count]) => {
-                if (count > maxVotes) { maxVotes = count; majorityTargetId = target; }
-            });
-            
-            const voterPromises = voterEntries.map(async ([voterId, vote]) => {
-                if (vote.target === majorityTargetId) {
-                    newScores[voterId] = (newScores[voterId] || 0) + (vote.doubleDown ? 2 : 1);
-                } else if (vote.doubleDown) {
-                    if (penalty === 'minus_two') {
-                        newScores[voterId] = (newScores[voterId] || 0) - 2;
-                    }
-                    if (penalty === 'reusable') {
-                        const { error } = await supabaseClient
-                            .from('players')
-                            .update({ double_down_used: true })
-                            .eq('id', voterId);
-                        if (error) console.error('Failed to mark double down used:', error);
-                    }
-                }
-            });
-            await Promise.all(voterPromises);
-        }
 
-        // CRITICAL FIX: Add timeout and retry logic for the main update
-        let updateAttempts = 0;
-        const maxAttempts = 3;
-        let lastError = null;
-        
-        while (updateAttempts < maxAttempts) {
             const { error } = await supabaseClient
                 .from('rooms')
                 .update({
@@ -2666,29 +2638,15 @@
                 })
                 .eq('id', roomId);
             
-            if (!error) {
-                // Success! Update local state immediately
-                state.scores = newScores;
-                showResults(); // Force immediate transition
-                return;
-            }
+            if (error) throw error;
             
-            lastError = error;
-            updateAttempts++;
-            console.warn(`Update attempt ${updateAttempts} failed:`, error);
-            await new Promise(r => setTimeout(r, 500 * updateAttempts)); // Exponential backoff
+        } catch (error) {
+            console.error('Reveal error:', error);
+            showToast('Failed to reveal: ' + error.message);
+            btn.disabled = false;
+            btn.textContent = '🎉 Reveal Votes';
         }
-        
-        throw lastError || new Error('Failed to update after max attempts');
-        
-    } catch (error) {
-        console.error('Reveal error:', error);
-        showToast('Failed to reveal: ' + error.message);
-        // CRITICAL: Always reset button state on error
-        btn.disabled = false;
-        btn.textContent = '🎉 Reveal Votes';
     }
-}
 
     function showResults() {
         document.getElementById('readerView').style.display = 'none';
