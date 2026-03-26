@@ -1882,8 +1882,9 @@
             if (state.gameState === 'results') {
                 showResults();
             } else if (isNewRound || wasResults) {
-                // NEW ROUND: Reset views properly
+                // NEW ROUND: Clear stale votes immediately before reinitializing
                 console.log('New round detected - reinitializing game view');
+                state.votes = {};
                 initGameView();
             } else {
                 // Same round, just update
@@ -2023,6 +2024,9 @@
 
         // Always hide results when initializing a fresh round
         resultsView.style.display = 'none';
+        // Always hide reveal button at start — only shown when conditions are truly met
+        const revealBtnInit = document.getElementById('revealBtn');
+        if (revealBtnInit) revealBtnInit.classList.add('hidden');
         
         if (isInstigator) {
             console.log('SHOWING INSTIGATOR VIEW');
