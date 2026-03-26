@@ -1325,7 +1325,7 @@
                     <div id="majorityTarget" style="font-size: 1.4rem; font-weight: bold; color: #2ecc71;"></div>
                 </div>
 
-                <button class="btn-primary" onclick="acknowledgeResults()" id="continueBtn">
+                <button class="btn-primary hidden" onclick="acknowledgeResults()" id="continueBtn">
                     Continue
                 </button>
             </div>
@@ -2310,8 +2310,12 @@
         if (state.instigatorVoteConfirmed && voters.length > 0) {
             const allVoted = voters.every(p => state.votes[p.id]);
             const revealBtn = document.getElementById('revealBtn');
-            if (revealBtn && allVoted) {
-                revealBtn.classList.remove('hidden');
+            if (revealBtn) {
+                if (allVoted) {
+                    revealBtn.classList.remove('hidden');
+                } else {
+                    revealBtn.classList.add('hidden');
+                }
             }
         }
     }
@@ -2751,6 +2755,16 @@
 
         list.innerHTML = rows.join('');
         updateScoreboard();
+
+        // Only host gets the continue button
+        const continueBtn = document.getElementById('continueBtn');
+        if (state.isHost) {
+            continueBtn.classList.remove('hidden');
+            continueBtn.textContent = 'Continue';
+            continueBtn.disabled = false;
+        } else {
+            continueBtn.classList.add('hidden');
+        }
     }
 
     function acknowledgeResults() {
