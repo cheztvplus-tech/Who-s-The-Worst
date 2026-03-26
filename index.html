@@ -377,31 +377,106 @@
             margin-bottom: 20px;
         }
 
-        .double-down-btn {
-            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            padding: 12px 30px;
-            border-radius: 25px;
-            border: 3px solid transparent;
-            font-weight: bold;
-            font-size: 1rem;
+        /* ===== POKER CARD DOUBLE DOWN ===== */
+        .poker-card-wrap {
+            display: inline-block;
+            perspective: 600px;
             cursor: pointer;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+            user-select: none;
         }
 
-        .double-down-btn.active {
-            border-color: #fff;
-            box-shadow: 0 0 20px rgba(245, 87, 108, 0.6);
-            transform: scale(1.05);
+        .poker-card {
+            width: 80px;
+            height: 110px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s;
+            border-radius: 10px;
         }
 
-        .double-down-btn.used {
-            opacity: 0.4;
+        .poker-card-wrap:hover .poker-card:not(.used-card) {
+            transform: translateY(-8px) rotate(-3deg);
+            box-shadow: 0 20px 40px rgba(245, 87, 108, 0.5);
+        }
+
+        .poker-card.active-card {
+            transform: translateY(-12px) rotate(-5deg) scale(1.08);
+            box-shadow: 0 0 30px rgba(245, 87, 108, 0.8), 0 0 60px rgba(245, 87, 108, 0.3);
+        }
+
+        .poker-card.used-card {
+            filter: grayscale(1) brightness(0.4);
             cursor: not-allowed;
-            background: #555;
+            transform: rotate(5deg);
+        }
+
+        .poker-card-face {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            background: #fff;
+            border: 2px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.8);
+        }
+
+        /* Card corner pips */
+        .card-corner {
+            position: absolute;
+            font-size: 0.65rem;
+            font-weight: bold;
+            color: #e63946;
+            line-height: 1;
+            font-family: 'Georgia', serif;
+        }
+        .card-corner.tl { top: 5px; left: 6px; text-align: left; }
+        .card-corner.br { bottom: 5px; right: 6px; text-align: right; transform: rotate(180deg); }
+
+        .card-center-suit {
+            font-size: 2.4rem;
+            line-height: 1;
+            filter: drop-shadow(0 2px 4px rgba(230, 57, 70, 0.3));
+        }
+
+        .card-label-text {
+            font-size: 0.5rem;
+            font-weight: bold;
+            color: #e63946;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 3px;
+            font-family: Georgia, serif;
+        }
+
+        /* Card back pattern (for used state overlay) */
+        .poker-card-face::before {
+            content: '';
+            position: absolute;
+            inset: 3px;
+            border-radius: 7px;
+            border: 1px solid rgba(230, 57, 70, 0.15);
+            pointer-events: none;
+        }
+
+        .dd-label {
+            font-size: 0.75rem;
+            color: #a0a0a0;
+            margin-top: 8px;
+            font-style: italic;
+        }
+
+        .dd-label.active-label {
+            color: #f5576c;
+            font-weight: bold;
+        }
+
+        .dd-label.used-label {
+            color: #555;
         }
 
         .vote-grid {
@@ -1147,6 +1222,11 @@
                                 <div style="font-size:0.75rem; font-weight:bold; margin-top:4px;">-2 Points</div>
                                 <div style="font-size:0.65rem; color:#a0a0a0;">Harsh mode</div>
                             </div>
+                            <div onclick="setPenalty('reusable')" id="penaltyReusable" class="penalty-option" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); cursor:pointer; text-align:center;">
+                                <div style="font-size:1.2rem;">♻️</div>
+                                <div style="font-size:0.75rem; font-weight:bold; margin-top:4px;">Reusable</div>
+                                <div style="font-size:0.65rem; color:#a0a0a0;">Lost if wrong</div>
+                            </div>
                         </div>
                     </div>
                     <button class="btn-primary" onclick="startGame()" id="startBtn" disabled>
@@ -1199,12 +1279,17 @@
                 </div>
 
                 <div class="double-down-section" id="doubleDownSection" style="display: none;">
-                    <button class="double-down-btn" id="doubleDownBtn" onclick="toggleDoubleDown()">
-                        🚀 DOUBLE DOWN
-                    </button>
-                    <p style="font-size: 0.8rem; color: #a0a0a0; margin-top: 8px;">
-                        Use once per game for 2x points!
-                    </p>
+                    <div class="poker-card-wrap" onclick="toggleDoubleDown()" id="pokerCardWrap">
+                        <div class="poker-card" id="pokerCard">
+                            <div class="poker-card-face">
+                                <div class="card-corner tl">2x<br>♠</div>
+                                <div class="card-center-suit">🃏</div>
+                                <div class="card-label-text">Double<br>Down</div>
+                                <div class="card-corner br">2x<br>♠</div>
+                            </div>
+                        </div>
+                        <div class="dd-label" id="ddLabel">Tap to activate 2× points</div>
+                    </div>
                 </div>
 
                 <div id="votingSection" style="display: none;">
@@ -1498,10 +1583,15 @@
 
     function setPenalty(type) {
         state.doubleDownPenalty = type;
-        document.getElementById('penaltyLoseCard').style.borderColor = type === 'lose_card' ? '#ff6b6b' : 'rgba(255,255,255,0.15)';
-        document.getElementById('penaltyLoseCard').style.background = type === 'lose_card' ? 'rgba(255,107,107,0.12)' : 'rgba(255,255,255,0.05)';
-        document.getElementById('penaltyMinusTwo').style.borderColor = type === 'minus_two' ? '#ff6b6b' : 'rgba(255,255,255,0.15)';
-        document.getElementById('penaltyMinusTwo').style.background = type === 'minus_two' ? 'rgba(255,107,107,0.12)' : 'rgba(255,255,255,0.05)';
+        const ids = ['penaltyLoseCard', 'penaltyMinusTwo', 'penaltyReusable'];
+        const vals = ['lose_card', 'minus_two', 'reusable'];
+        ids.forEach((id, i) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const selected = vals[i] === type;
+            el.style.borderColor = selected ? '#ff6b6b' : 'rgba(255,255,255,0.15)';
+            el.style.background = selected ? 'rgba(255,107,107,0.12)' : 'rgba(255,255,255,0.05)';
+        });
     }
 
     function switchTab(tab) {
@@ -2015,14 +2105,7 @@
                     document.getElementById('votingSection').style.display = 'block';
                     document.getElementById('waitingSection').style.display = 'none';
 
-                    const ddBtn = document.getElementById('doubleDownBtn');
-                    if (state.currentUser?.double_down_used) {
-                        ddBtn.classList.add('used');
-                        ddBtn.disabled = true;
-                    } else {
-                        ddBtn.classList.remove('used', 'active');
-                        ddBtn.disabled = false;
-                    }
+                    updatePokerCard(state.currentUser?.double_down_used);
                     updateVoteOptions();
                 } else if (state.hasVoted) {
                     voterStatus.textContent = 'Vote submitted! Waiting...';
@@ -2190,14 +2273,7 @@
                     document.getElementById('votingSection').style.display = 'block';
                     document.getElementById('waitingSection').style.display = 'none';
                     
-                    const ddBtn = document.getElementById('doubleDownBtn');
-                    if (state.currentUser?.double_down_used) {
-                        ddBtn.classList.add('used');
-                        ddBtn.disabled = true;
-                    } else {
-                        ddBtn.classList.remove('used', 'active');
-                        ddBtn.disabled = false;
-                    }
+                    updatePokerCard(state.currentUser?.double_down_used);
                     updateVoteOptions();
                 } else {
                     document.getElementById('voterQuestionCard').textContent = state.currentQuestion;
@@ -2253,9 +2329,29 @@
         }).join('');
     }
 
+    function updatePokerCard(isUsed) {
+        const card = document.getElementById('pokerCard');
+        const label = document.getElementById('ddLabel');
+        if (!card) return;
+        card.classList.remove('active-card', 'used-card');
+        if (isUsed) {
+            card.classList.add('used-card');
+            if (label) { label.textContent = 'Card spent'; label.className = 'dd-label used-label'; }
+        } else {
+            if (label) { label.textContent = 'Tap to activate 2× points'; label.className = 'dd-label'; }
+        }
+    }
+
     function toggleDoubleDown() {
-        const btn = document.getElementById('doubleDownBtn');
-        btn.classList.toggle('active');
+        const card = document.getElementById('pokerCard');
+        const label = document.getElementById('ddLabel');
+        const wrap = document.getElementById('pokerCardWrap');
+        if (!card || card.classList.contains('used-card')) return;
+        const isActive = card.classList.toggle('active-card');
+        if (label) {
+            label.textContent = isActive ? '🔥 Double Down ACTIVE!' : 'Tap to activate 2× points';
+            label.className = 'dd-label' + (isActive ? ' active-label' : '');
+        }
     }
 
     // ==========================================
@@ -2429,7 +2525,8 @@
             return;
         }
         
-        const doubleDown = document.getElementById('doubleDownBtn').classList.contains('active');
+        const card = document.getElementById('pokerCard');
+        const doubleDown = card ? card.classList.contains('active-card') : false;
         
         document.querySelectorAll('.vote-option').forEach(el => el.classList.remove('selected'));
         document.getElementById(`vote-${targetId}`).classList.add('selected');
@@ -2447,7 +2544,9 @@
             
             if (error) throw error;
             
-            if (doubleDown) {
+            // For 'lose_card' and 'minus_two': mark as used permanently
+            // For 'reusable': only mark used if they win (handled at reveal); here just flag it was used this round
+            if (doubleDown && state.doubleDownPenalty !== 'reusable') {
                 await supabaseClient
                     .from('players')
                     .update({ double_down_used: true })
@@ -2484,6 +2583,8 @@
 
             // Who matched the instigator's pick?
             const matchers = voterEntries.filter(([, vote]) => vote.target === instigatorTarget);
+            // Players who doubled down but were wrong
+            const wrongDoubleDowners = voterEntries.filter(([, vote]) => vote.doubleDown && vote.target !== instigatorTarget);
 
             if (matchers.length > 0) {
                 // Matched players earn points
@@ -2492,11 +2593,15 @@
                     newScores[voterId] = (newScores[voterId] || 0) + points;
                 });
                 // Wrong Double-Downers: apply penalty
-                voterEntries.filter(([, vote]) => vote.doubleDown && vote.target !== instigatorTarget).forEach(([voterId]) => {
+                wrongDoubleDowners.forEach(([voterId]) => {
                     if (penalty === 'minus_two') {
                         newScores[voterId] = (newScores[voterId] || 0) - 2;
                     }
-                    // 'lose_card' = no point change, they just lose the card (already marked used in DB)
+                    // 'lose_card': no point change, card already marked used
+                    // 'reusable': mark card as used (burned on wrong guess)
+                    if (penalty === 'reusable') {
+                        supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
+                    }
                 });
             } else {
                 // Nobody matched — fall back to majority vote
@@ -2512,15 +2617,16 @@
                 voterEntries.forEach(([voterId, vote]) => {
                     if (vote.target === majorityTargetId) {
                         newScores[voterId] = (newScores[voterId] || 0) + (vote.doubleDown ? 2 : 1);
-                    } else if (vote.doubleDown && penalty === 'minus_two') {
-                        newScores[voterId] = (newScores[voterId] || 0) - 2;
+                    } else if (vote.doubleDown) {
+                        if (penalty === 'minus_two') {
+                            newScores[voterId] = (newScores[voterId] || 0) - 2;
+                        }
+                        if (penalty === 'reusable') {
+                            supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
+                        }
                     }
                 });
             }
-
-            // Instigator NEVER earns points — reset their score for this round if changed
-            // (they start the round without being allowed to score)
-            // No-op needed: instigator is excluded from voterEntries above.
 
             const { error } = await supabaseClient
                 .from('rooms')
