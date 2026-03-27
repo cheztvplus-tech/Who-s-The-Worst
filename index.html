@@ -1375,7 +1375,7 @@
             <p style="color: #a0a0a0; font-size: 0.9rem; margin-bottom: 22px; line-height: 1.5;" id="leaveModalMsg">Are you sure you want to leave?</p>
             <div style="display: flex; gap: 10px;">
                 <button class="btn-secondary" onclick="hideLeaveModal()" style="flex: 1; margin: 0;">Cancel</button>
-                <button class="btn-danger" onclick="leaveRoom()" style="flex: 1; margin: 0;">Leave</button>
+                <button class="btn-danger" onclick="document.getElementById('leaveModal').classList.remove('active'); leaveRoom();" style="flex: 1; margin: 0;">Leave Game</button>
             </div>
         </div>
     </div>
@@ -2957,7 +2957,7 @@
     }
 
     function hideLeaveModal(event) {
-        if (!event || event.target.id === 'leaveModal' || event.target.tagName === 'BUTTON') {
+        if (!event || event.target.id === 'leaveModal') {
             document.getElementById('leaveModal').classList.remove('active');
         }
     }
