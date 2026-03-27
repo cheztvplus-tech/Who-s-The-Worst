@@ -1367,6 +1367,19 @@
         </div>
     </div>
 
+    <!-- Leave Room Confirmation Modal -->
+    <div id="leaveModal" class="rules-modal" onclick="hideLeaveModal(event)">
+        <div class="rules-content" onclick="event.stopPropagation()" style="text-align: center; max-width: 340px;">
+            <div style="font-size: 2.5rem; margin-bottom: 12px;">🚪</div>
+            <h3 style="margin-bottom: 10px;">Leave the game?</h3>
+            <p style="color: #a0a0a0; font-size: 0.9rem; margin-bottom: 22px; line-height: 1.5;" id="leaveModalMsg">Are you sure you want to leave?</p>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-secondary" onclick="hideLeaveModal()" style="flex: 1; margin: 0;">Cancel</button>
+                <button class="btn-danger" onclick="leaveRoom()" style="flex: 1; margin: 0;">Leave</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toast" class="toast"></div>
 
     <script>
@@ -2639,6 +2652,7 @@
                     // 'reusable': mark card as used (burned on wrong guess)
                     if (penalty === 'reusable') {
                         supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
+                        if (voterId === state.currentUser?.id) state.currentUser.double_down_used = true;
                     }
                 });
             } else {
@@ -2661,6 +2675,7 @@
                         }
                         if (penalty === 'reusable') {
                             supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
+                            if (voterId === state.currentUser?.id) state.currentUser.double_down_used = true;
                         }
                     }
                 });
@@ -2924,9 +2939,18 @@
         document.getElementById('roomCodeInput').value = '';
     }
 
-        function confirmLeaveRoom() {
-        if (confirm('Are you sure you want to leave the game?')) {
-            leaveRoom();
+    function confirmLeaveRoom() {
+        const isHost = state.isHost;
+        const msg = isHost
+            ? "You're the host — leaving will end the game for everyone!"
+            : "Are you sure you want to leave the game?";
+        document.getElementById('leaveModalMsg').textContent = msg;
+        document.getElementById('leaveModal').classList.add('active');
+    }
+
+    function hideLeaveModal(event) {
+        if (!event || event.target.id === 'leaveModal' || event.target.tagName === 'BUTTON') {
+            document.getElementById('leaveModal').classList.remove('active');
         }
     }
 
