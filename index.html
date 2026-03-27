@@ -2080,6 +2080,8 @@
                 const allVoted = voters.length > 0 && voters.every(p => state.votes[p.id]);
                 if (allVoted) {
                     revealBtn.classList.remove('hidden');
+                    revealBtn.disabled = false;
+                    revealBtn.textContent = '🎉 Reveal Votes';
                     showToast('Everyone voted! Reveal when ready.');
                 } else {
                     revealBtn.classList.add('hidden');
@@ -2310,16 +2312,16 @@
             `;
         }).join('');
 
-        // Auto-show reveal button when all non-instigator players have voted
-        if (state.instigatorVoteConfirmed && voters.length > 0) {
-            const allVoted = voters.every(p => state.votes[p.id]);
-            const revealBtn = document.getElementById('revealBtn');
-            if (revealBtn) {
-                if (allVoted) {
-                    revealBtn.classList.remove('hidden');
-                } else {
-                    revealBtn.classList.add('hidden');
-                }
+        // Always manage reveal button: only show when instigator confirmed AND all voters have voted
+        const revealBtn = document.getElementById('revealBtn');
+        if (revealBtn) {
+            const allVoted = voters.length > 0 && voters.every(p => state.votes[p.id]);
+            if (state.instigatorVoteConfirmed && allVoted) {
+                revealBtn.classList.remove('hidden');
+                revealBtn.disabled = false;
+                revealBtn.textContent = '🎉 Reveal Votes';
+            } else {
+                revealBtn.classList.add('hidden');
             }
         }
     }
@@ -2871,6 +2873,10 @@
         state.hasVoted = false;
         state.scores = {};
         
+        // Always reset the join button so it's never stuck in loading state
+        const joinBtn = document.getElementById('joinBtn');
+        if (joinBtn) { joinBtn.disabled = false; joinBtn.textContent = 'Join Game'; }
+
         showScreen('joinScreen');
         document.getElementById('usernameInput').value = '';
         document.getElementById('roomCodeInput').value = '';
