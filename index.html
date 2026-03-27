@@ -668,10 +668,38 @@
             h1 { font-size:1.75rem; }
             .flip-card-container { width:115px; height:160px; }
         }
+
+        /* ===== MUTE BUTTON ===== */
+        #muteBtn {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            margin: 0;
+            text-transform: none;
+            letter-spacing: 0;
+            transition: background 0.2s;
+            width: 36px !important;
+        }
+        #muteBtn:hover { background: rgba(255,255,255,0.18); }
     </style>
 </head>
 <body>
     <canvas id="confettiCanvas"></canvas>
+    <button id="muteBtn" onclick="toggleMute()" title="Toggle sound">🔊</button>
+
     <div id="connectionStatus" class="connection-status connecting">
         <div class="pulse-dot"></div>
         <span>Connecting...</span>
@@ -1019,6 +1047,49 @@
             document.getElementById('rulesModal').classList.remove('active');
         }
     }
+    // ==========================================
+    // SOUND SYSTEM
+    // ==========================================
+    const SOUND_BASE = 'https://raw.githubusercontent.com/cheztvplus-tech/Who-s-The-Worst/main/sounds/';
+
+    const SOUNDS = {
+        cardFlip:    new Audio(SOUND_BASE + 'card-flip.opus'),
+        voteClick:   new Audio(SOUND_BASE + 'vote-click.opus'),
+        correct:     new Audio(SOUND_BASE + 'correct-guess.opus'),
+        wrong:       new Audio(SOUND_BASE + 'wrong-guess.opus'),
+        reveal:      new Audio(SOUND_BASE + 'reveal.opus'),
+        win:         new Audio(SOUND_BASE + 'win.opus'),
+        doubleDown:  new Audio(SOUND_BASE + 'double-down.opus'),
+        lost:        new Audio(SOUND_BASE + 'lost.opus'),
+        penalty:     new Audio(SOUND_BASE + 'penalty.opus'),
+    };
+
+    // Preload all sounds
+    Object.values(SOUNDS).forEach(s => { s.preload = 'auto'; });
+
+    let isMuted = localStorage.getItem('wtw_muted') === 'true';
+
+    function playSound(name) {
+        if (isMuted) return;
+        const s = SOUNDS[name];
+        if (!s) return;
+        s.currentTime = 0;
+        s.play().catch(() => {});
+    }
+
+    function toggleMute() {
+        isMuted = !isMuted;
+        localStorage.setItem('wtw_muted', isMuted);
+        document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🔊';
+    }
+
+    // Set initial mute icon once DOM ready
+    window.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('muteBtn');
+        if (btn) btn.textContent = isMuted ? '🔇' : '🔊';
+    });
+
+
     // ==========================================
     // VISUAL ENHANCEMENTS (pure UI, no game logic)
     // ==========================================
@@ -2151,6 +2222,7 @@
         if (!card || card.classList.contains('used-card')) return;
         haptic([20, 30]);
         const isActive = card.classList.toggle('active-card');
+        if (isActive) playSound('doubleDown');
         if (label) {
             label.textContent = isActive ? '🔥 Double Down ACTIVE!' : 'Tap to activate 2× points';
             label.className = 'dd-label' + (isActive ? ' active-label' : '');
@@ -2268,6 +2340,7 @@
     function flipAndSelectCard(cardIndex) {
         const container = document.getElementById(`flipcard-${cardIndex}`);
         if (!container) return;
+        playSound('cardFlip');
         container.classList.toggle('flipped');
     }
 
@@ -2323,6 +2396,7 @@
     async function submitVote(targetId) {
         if (state.hasVoted) return;
         haptic([15]);
+        playSound('voteClick');
 
         if (!state.instigatorVoteConfirmed && state.currentReader !== state.currentUser?.id) {
             showToast('Wait for the Instigator to vote first!');
@@ -2371,6 +2445,7 @@
 
     async function revealVotes() {
         haptic([10, 40, 80]);
+        playSound('reveal');
         const btn = document.getElementById('revealBtn');
         btn.disabled = true;
         btn.textContent = 'Revealing...';
@@ -2566,7 +2641,7 @@
         // Animate result rows in one-by-one
         setTimeout(animateResultItems, 80);
 
-        // Confetti + haptic on results
+        // Confetti + haptic + sounds on results
         haptic([30, 50, 30]);
         const anyCorrect = voterEntries.some(([vid, vote]) => {
             if (vid === state.currentReader) return false;
@@ -2574,6 +2649,26 @@
             return vote.target === majorityTargetId;
         });
         if (anyCorrect) setTimeout(launchConfetti, 300);
+
+        // Play sound based on THIS player's result
+        const myVote = state.votes[state.currentUser?.id];
+        if (state.currentUser?.id !== state.currentReader && myVote) {
+            const myCorrect = anyMatched
+                ? myVote.target === instigatorTarget
+                : myVote.target === majorityTargetId;
+            const myPenalty = !myCorrect && myVote.doubleDown;
+            setTimeout(() => {
+                if (myPenalty && (state.doubleDownPenalty === 'minus_two')) {
+                    playSound('penalty');
+                } else if (myPenalty) {
+                    playSound('lost');
+                } else if (myCorrect) {
+                    playSound('correct');
+                } else {
+                    playSound('wrong');
+                }
+            }, 400);
+        }
 
         // Only host gets the continue button
         const continueBtn = document.getElementById('continueBtn');
@@ -2643,6 +2738,7 @@
         showScreen('winnerScreen');
         setTimeout(launchConfetti, 400);
         haptic([50, 30, 50, 30, 100]);
+        setTimeout(() => playSound('win'), 200);
         
         const winner = state.players.find(p => p.id === winnerId);
         document.getElementById('winnerName').textContent = winner?.name || 'Unknown';
