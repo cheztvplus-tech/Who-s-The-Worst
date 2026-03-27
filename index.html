@@ -1849,6 +1849,30 @@
         currentQuestion: room.current_question,
         round: room.current_round
     });
+
+    // Host has left — kick all remaining players back to join screen
+    if (room.game_state === 'host_left') {
+        if (realtimeChannel) {
+            supabaseClient.removeChannel(realtimeChannel);
+            realtimeChannel = null;
+        }
+        clearSession();
+        state.currentUser = null;
+        state.roomCode = null;
+        state.isHost = false;
+        state.players = [];
+        state.gameState = 'waiting';
+        state.hasVoted = false;
+        state.scores = {};
+        const joinBtn = document.getElementById('joinBtn');
+        if (joinBtn) { joinBtn.disabled = false; joinBtn.textContent = 'Join Game'; }
+        showScreen('joinScreen');
+        document.getElementById('usernameInput').value = '';
+        document.getElementById('roomCodeInput').value = '';
+        // Show a prominent toast
+        showToast('👑 The host left — session ended', 5000, true);
+        return;
+    }
     
     // Check if we're transitioning to a new round before updating state
     const isNewRound = room.game_state === 'playing' && !room.current_question && state.currentQuestion;
@@ -2857,8 +2881,16 @@
                 const roomId = state.currentUser.room_id;
 
                 if (state.isHost && roomId) {
-                    // Host leaving: wipe everything related to the room in order
-                    // (votes → used_questions → players → room)
+                    // Signal to all other clients that the host has left, then give them
+                    // a moment to receive it before we wipe the data
+                    await supabaseClient
+                        .from('rooms')
+                        .update({ game_state: 'host_left' })
+                        .eq('id', roomId);
+
+                    await new Promise(resolve => setTimeout(resolve, 800));
+
+                    // Now wipe everything in order (votes → used_questions → players → room)
                     await supabaseClient.from('votes').delete().eq('room_id', roomId);
                     await supabaseClient.from('used_questions').delete().eq('room_id', roomId);
                     await supabaseClient.from('players').delete().eq('room_id', roomId);
@@ -2927,11 +2959,19 @@
     }
 }
 
-    function showToast(message, duration = 3000) {
+    function showToast(message, duration = 3000, warn = false) {
         const toast = document.getElementById('toast');
         toast.textContent = message;
+        toast.style.borderColor = warn ? 'rgba(255, 71, 87, 0.5)' : 'rgba(255, 255, 255, 0.1)';
+        toast.style.background = warn ? 'rgba(40, 0, 0, 0.95)' : 'rgba(0, 0, 0, 0.9)';
+        toast.style.fontSize = warn ? '1rem' : '';
         toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), duration);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            toast.style.borderColor = '';
+            toast.style.background = '';
+            toast.style.fontSize = '';
+        }, duration);
     }
 
     function showError(elementId, message) {
