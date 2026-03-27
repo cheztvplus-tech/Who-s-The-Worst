@@ -719,16 +719,16 @@
         <div id="joinScreen" class="screen">
             <h1>👑 Who's The Worst?</h1>
             <p class="subtitle">The party game of savage voting 
-                <span class="rule-icon" onclick="showRules()">ℹ️</span>
+                <span class="rule-icon" onclick="playSound('click'); showRules()">ℹ️</span>
             </p>
             
             <div class="card">
                 <input type="text" id="usernameInput" placeholder="Your name" maxlength="15" autocomplete="off">
                 <input type="text" id="roomCodeInput" placeholder="Room code (e.g., ABC123)" maxlength="6" style="text-transform: uppercase;">
-                <button class="btn-primary" onclick="joinGame()" id="joinBtn">
+                <button class="btn-primary" onclick="playSound('click'); joinGame()" id="joinBtn">
                     Join Game
                 </button>
-                <button class="btn-secondary" onclick="createRoom()">
+                <button class="btn-secondary" onclick="playSound('click'); createRoom()">
                     Create New Room
                 </button>
                 <div id="joinError" class="error"></div>
@@ -747,7 +747,7 @@
             </div>
             
             <div class="admin-login">
-                <button class="btn-admin" onclick="showAdminLogin()">
+                <button class="btn-admin" onclick="playSound('click'); showAdminLogin()">
                     🔐 Admin Access
                 </button>
             </div>
@@ -760,10 +760,10 @@
             
             <div class="card">
                 <input type="password" id="adminPassword" placeholder="Admin password">
-                <button class="btn-admin" onclick="adminLogin()" id="adminLoginBtn">
+                <button class="btn-admin" onclick="playSound('click'); adminLogin()" id="adminLoginBtn">
                     Login
                 </button>
-                <button class="btn-secondary" onclick="showScreen('joinScreen')">
+                <button class="btn-secondary" onclick="playSound('click'); showScreen('joinScreen')">
                     Back to Game
                 </button>
                 <div id="adminLoginError" class="error"></div>
@@ -776,8 +776,8 @@
             <p class="subtitle">Manage game questions</p>
             
             <div class="tabs">
-                <button class="tab active" onclick="switchTab('add')">Add Question</button>
-                <button class="tab" onclick="switchTab('view')">View All</button>
+                <button class="tab active" onclick="playSound('click'); switchTab('add')">Add Question</button>
+                <button class="tab" onclick="playSound('click'); switchTab('view')">View All</button>
             </div>
 
             <div id="addTab" class="tab-content active">
@@ -818,7 +818,7 @@
                         <option value="FINAL DANGER ROUND">FINAL DANGER ROUND</option>
                         <option value="Custom">Custom</option>
                     </select>
-                    <button class="btn-primary" onclick="addNewQuestion()">Add Question</button>
+                    <button class="btn-primary" onclick="playSound('click'); addNewQuestion()">Add Question</button>
                     <div id="adminError" class="error"></div>
                 </div>
             </div>
@@ -832,7 +832,7 @@
                 </div>
             </div>
 
-            <button class="btn-secondary" onclick="logoutAdmin()" style="margin-top: 10px;">Logout</button>
+            <button class="btn-secondary" onclick="playSound('click'); logoutAdmin()" style="margin-top: 10px;">Logout</button>
         </div>
 
         <!-- Lobby Screen -->
@@ -841,7 +841,7 @@
             
             <div class="game-code-display">
                 <div style="font-size: 0.9rem; color: #a0a0a0; margin-bottom: 5px;">ROOM CODE</div>
-                <div class="game-code" id="displayRoomCode" onclick="copyRoomCode()">---</div>
+                <div class="game-code" id="displayRoomCode" onclick="playSound('click'); copyRoomCode()">---</div>
                 <div style="font-size: 0.8rem; color: #a0a0a0; margin-top: 5px;">Tap to copy</div>
             </div>
 
@@ -866,24 +866,24 @@
                     <div id="penaltySettingBox" style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 14px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.1);">
                         <div style="color: #feca57; font-size: 0.85rem; font-weight: bold; margin-bottom: 10px;">🚀 Double Down Penalty (Wrong guess):</div>
                         <div style="display: flex; gap: 8px;">
-                            <div onclick="setPenalty('lose_card')" id="penaltyLoseCard" class="penalty-option selected" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid #ff6b6b; background:rgba(255,107,107,0.12); cursor:pointer; text-align:center;">
+                            <div onclick="playSound('click'); setPenalty('lose_card')" id="penaltyLoseCard" class="penalty-option selected" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid #ff6b6b; background:rgba(255,107,107,0.12); cursor:pointer; text-align:center;">
                                 <div style="font-size:1.2rem;">🃏</div>
                                 <div style="font-size:0.75rem; font-weight:bold; margin-top:4px;">Lose Card</div>
                                 <div style="font-size:0.65rem; color:#a0a0a0;">No penalty pts</div>
                             </div>
-                            <div onclick="setPenalty('minus_two')" id="penaltyMinusTwo" class="penalty-option" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); cursor:pointer; text-align:center;">
+                            <div onclick="playSound('click'); setPenalty('minus_two')" id="penaltyMinusTwo" class="penalty-option" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); cursor:pointer; text-align:center;">
                                 <div style="font-size:1.2rem;">💀</div>
                                 <div style="font-size:0.75rem; font-weight:bold; margin-top:4px;">-2 Points</div>
                                 <div style="font-size:0.65rem; color:#a0a0a0;">Harsh mode</div>
                             </div>
-                            <div onclick="setPenalty('reusable')" id="penaltyReusable" class="penalty-option" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); cursor:pointer; text-align:center;">
+                            <div onclick="playSound('click'); setPenalty('reusable')" id="penaltyReusable" class="penalty-option" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); cursor:pointer; text-align:center;">
                                 <div style="font-size:1.2rem;">♻️</div>
                                 <div style="font-size:0.75rem; font-weight:bold; margin-top:4px;">Reusable</div>
                                 <div style="font-size:0.65rem; color:#a0a0a0;">Lost if wrong</div>
                             </div>
                         </div>
                     </div>
-                    <button class="btn-primary" onclick="startGame()" id="startBtn" disabled>
+                    <button class="btn-primary" onclick="playSound('click'); startGame()" id="startBtn" disabled>
                         Start Game
                     </button>
                 </div>
@@ -893,7 +893,7 @@
                 </div>
             </div>
 
-            <button class="btn-secondary" onclick="leaveRoom()" style="margin-top: 15px;">🚪 Leave Room</button>
+            <button class="btn-secondary" onclick="playSound('click'); leaveRoom()" style="margin-top: 15px;">🚪 Leave Room</button>
         </div>
 
         <!-- Game Screen -->
@@ -912,9 +912,9 @@
                 </div>
 
                 <div class="action-buttons">
-                    <button class="btn-primary" onclick="drawCard()" id="drawCardBtn">🃏 Draw Cards</button>
+                    <button class="btn-primary" onclick="playSound('click'); drawCard()" id="drawCardBtn">🃏 Draw Cards</button>
                     <button class="btn-success hidden" onclick="revealVotes()" id="revealBtn">🎉 Reveal Votes</button>
-                    <button class="btn-primary hidden" onclick="nextRound()" id="nextRoundBtn">Next Round</button>
+                    <button class="btn-primary hidden" onclick="playSound('click'); nextRound()" id="nextRoundBtn">Next Round</button>
                 </div>
 
                 <div class="card" style="margin-top: 20px;">
@@ -980,12 +980,12 @@
                     <div id="majorityTarget" style="font-size: 1.4rem; font-weight: bold; color: #2ecc71;"></div>
                 </div>
 
-                <button class="btn-primary hidden" onclick="acknowledgeResults()" id="continueBtn">
+                <button class="btn-primary hidden" onclick="playSound('click'); acknowledgeResults()" id="continueBtn">
                     Continue
                 </button>
             </div>
         
-            <button class="btn-secondary" onclick="confirmLeaveRoom()" style="margin-top: 20px; opacity: 0.8;">
+            <button class="btn-secondary" onclick="playSound('click'); confirmLeaveRoom()" style="margin-top: 20px; opacity: 0.8;">
                 🚪 Leave Room
             </button>
 
@@ -999,8 +999,8 @@
                 
                 <div class="final-standings" id="finalStandings"></div>
                 
-                <button class="btn-primary" onclick="playAgain()">Play Again</button>
-                <button class="btn-secondary" onclick="leaveRoom()">Leave Room</button>
+                <button class="btn-primary" onclick="playSound('click'); playAgain()">Play Again</button>
+                <button class="btn-secondary" onclick="playSound('click'); leaveRoom()">Leave Room</button>
             </div>
         </div>
     </div>
@@ -1018,7 +1018,7 @@
                 <li><strong>Double Down:</strong> Use once per game (or every round if host allows). Correct = 2 points, Wrong = lose card (or -2 pts in harsh mode).</li>
                 <li>Next round: New Instigator goes round-robin.</li>
             </ol>
-            <button class="btn-secondary close-rules" onclick="hideRules()">Got it</button>
+            <button class="btn-secondary close-rules" onclick="playSound('click'); hideRules()">Got it</button>
         </div>
     </div>
 
@@ -1029,8 +1029,8 @@
             <h3 style="margin-bottom: 10px;">Leave the game?</h3>
             <p style="color: #a0a0a0; font-size: 0.9rem; margin-bottom: 22px; line-height: 1.5;" id="leaveModalMsg">Are you sure you want to leave?</p>
             <div style="display: flex; gap: 10px;">
-                <button class="btn-secondary" onclick="hideLeaveModal()" style="flex: 1; margin: 0;">Cancel</button>
-                <button class="btn-danger" onclick="leaveRoom()" style="flex: 1; margin: 0;">Leave</button>
+                <button class="btn-secondary" onclick="playSound('click'); hideLeaveModal()" style="flex: 1; margin: 0;">Cancel</button>
+                <button class="btn-danger" onclick="document.getElementById('leaveModal').classList.remove('active'); leaveRoom();" style="flex: 1; margin: 0;">Leave</button>
             </div>
         </div>
     </div>
@@ -1062,6 +1062,7 @@
         doubleDown:  new Audio(SOUND_BASE + 'double-down.opus'),
         lost:        new Audio(SOUND_BASE + 'lost.opus'),
         penalty:     new Audio(SOUND_BASE + 'penalty.opus'),
+        click:       new Audio(SOUND_BASE + 'click.opus'),
     };
 
     // Preload all sounds
@@ -1999,7 +2000,7 @@
                 <p style="color: #a0a0a0; font-size: 0.8rem; text-align:center; margin-bottom: 14px;">You cannot pick yourself. Others will guess who you picked.</p>
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
                     ${state.players.filter(p => p.id !== state.currentUser.id).map(p => `
-                        <div onclick="selectInstigatorVote('${p.id}')" 
+                        <div onclick="playSound('click'); selectInstigatorVote('${p.id}')" 
                              id="instigator-vote-${p.id}"
                              style="background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); 
                                     border-radius: 14px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.2s;">
@@ -2758,6 +2759,10 @@
     }
 
     async function leaveRoom() {
+        // Always dismiss leave modal immediately regardless of how leaveRoom was called
+        const lm = document.getElementById('leaveModal');
+        if (lm) lm.classList.remove('active');
+
         if (realtimeChannel) {
             supabaseClient.removeChannel(realtimeChannel);
             realtimeChannel = null;
