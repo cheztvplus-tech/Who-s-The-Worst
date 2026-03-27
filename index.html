@@ -2770,7 +2770,11 @@
                 points = correct ? (vote.doubleDown ? 2 : 1) : 0;
                 if (!correct && vote.doubleDown) {
                     if (penalty === 'minus_two') { penaltyText = '💀 -2 pts penalty'; points = -2; }
-                    else if (penalty === 'reusable') { penaltyText = '♻️ Card lost'; points = 0; }
+                    else if (penalty === 'reusable') {
+                        penaltyText = '♻️ Card lost'; points = 0;
+                        // Update local state immediately so the card shows as burned on this client
+                        if (voterId === state.currentUser?.id) state.currentUser.double_down_used = true;
+                    }
                     else { penaltyText = '🃏 Lost Double Down'; points = 0; }
                 }
             } else {
@@ -2779,7 +2783,11 @@
                 points = correct ? (vote.doubleDown ? 2 : 1) : 0;
                 if (!correct && vote.doubleDown) {
                     if (penalty === 'minus_two') { penaltyText = '💀 -2 pts penalty'; points = -2; }
-                    else if (penalty === 'reusable') { penaltyText = '♻️ Card lost'; points = 0; }
+                    else if (penalty === 'reusable') {
+                        penaltyText = '♻️ Card lost'; points = 0;
+                        // Update local state immediately so the card shows as burned on this client
+                        if (voterId === state.currentUser?.id) state.currentUser.double_down_used = true;
+                    }
                     else { penaltyText = '🃏 Lost Double Down'; points = 0; }
                 }
             }
