@@ -2854,9 +2854,19 @@
         
         try {
             if (state.currentUser) {
-                await supabaseClient.from('players').delete().eq('id', state.currentUser.id);
-                if (state.isHost && state.currentUser.room_id) {
-                    await supabaseClient.from('rooms').delete().eq('id', state.currentUser.room_id);
+                const roomId = state.currentUser.room_id;
+
+                if (state.isHost && roomId) {
+                    // Host leaving: wipe everything related to the room in order
+                    // (votes → used_questions → players → room)
+                    await supabaseClient.from('votes').delete().eq('room_id', roomId);
+                    await supabaseClient.from('used_questions').delete().eq('room_id', roomId);
+                    await supabaseClient.from('players').delete().eq('room_id', roomId);
+                    await supabaseClient.from('rooms').delete().eq('id', roomId);
+                } else {
+                    // Regular player leaving: remove their votes and their player row
+                    await supabaseClient.from('votes').delete().eq('player_id', state.currentUser.id);
+                    await supabaseClient.from('players').delete().eq('id', state.currentUser.id);
                 }
             }
         } catch (e) {
