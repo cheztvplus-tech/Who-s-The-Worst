@@ -1122,6 +1122,9 @@
             border-color:var(--gold); 
             transform:rotateY(180deg); 
             box-shadow:0 10px 30px rgba(254,202,87,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+            overflow: visible;
+            padding: 12px 8px;
+            gap: 5px;
         }
 
         /* Shine on back too */
@@ -1144,7 +1147,7 @@
         .flip-card-front .card-category { color:var(--gold); font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; text-align:center; font-weight: 700; }
         .flip-card-front .card-label    { color:#fff; font-size:0.85rem; font-weight:bold; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
 
-        .flip-card-back .card-question-text  { color:#fff; font-size:0.85rem; font-weight:600; line-height:1.4; text-align:center; margin-bottom:12px; }
+        .flip-card-back .card-question-text  { color:#fff; font-size:0.78rem; font-weight:600; line-height:1.35; text-align:center; margin-bottom:8px; }
         .flip-card-back .card-category-back  { color:var(--gold); font-size:0.7rem; text-transform:uppercase; letter-spacing: 1px; font-weight: 700; }
 
         .flip-card-back .pick-this-btn {
@@ -1667,6 +1670,14 @@ button:not(#muteBtn):active:not(:disabled) {
 .pick-this-btn {
     position: relative;
     overflow: hidden;
+    /* Fit inside the 150px card */
+    font-size: 0.7rem !important;
+    padding: 8px 10px !important;
+    white-space: nowrap;
+    width: auto !important;
+    max-width: 124px;
+    box-sizing: border-box;
+    letter-spacing: 0.3px !important;
 }
 .pick-this-btn::before {
     content: '';
@@ -1676,6 +1687,7 @@ button:not(#muteBtn):active:not(:disabled) {
     background: rgba(255,255,255,0.3);
     transform: skewX(-20deg);
     animation: btnShine 2.5s ease-in-out infinite;
+    pointer-events: none;
 }
 @keyframes btnShine {
     0%, 70%, 100% { left: -60%; opacity: 0; }
