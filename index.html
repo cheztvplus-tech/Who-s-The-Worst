@@ -4783,6 +4783,1065 @@ window.initGameView = function() {
 console.log('✨ Enhancement pack: Alive Players + Spotlight + Juicy Cards loaded');
 })();
 </script>
+
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║            ABILITY SYSTEM — WHO'S THE WORST?               ║
+     ║  • 10 curated abilities (40% offense, 30% defense,         ║
+     ║    20% chaos, 10% rare)                                     ║
+     ║  • Ability Points (AP) earned by correct guesses           ║
+     ║  • Shop, Loot Box, Underdog Shield, Streak Rewards         ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+<style>
+/* ══════════════════════════════════════
+   AP BAR — sits below scoreboard
+══════════════════════════════════════ */
+#apBar {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 4px 0 10px;
+    margin-bottom: 10px;
+    scrollbar-width: none;
+}
+#apBar::-webkit-scrollbar { display: none; }
+
+.ap-chip {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(254,202,87,0.25);
+    border-radius: 20px;
+    padding: 5px 10px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #feca57;
+    white-space: nowrap;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.ap-chip.me {
+    border-color: rgba(254,202,87,0.6);
+    background: rgba(254,202,87,0.1);
+    box-shadow: 0 0 12px rgba(254,202,87,0.2);
+}
+.ap-chip .ap-num { font-size: 0.85rem; }
+
+/* ══════════════════════════════════════
+   ABILITY TRAY — bottom of voter view
+══════════════════════════════════════ */
+#abilityTray {
+    margin-top: 18px;
+    padding: 14px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+#abilityTray h4 {
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+#abilityTray h4 span { color: #feca57; }
+
+.ability-slots {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ability-slot {
+    flex: 1;
+    min-width: 70px;
+    max-width: 100px;
+    background: rgba(255,255,255,0.04);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 14px;
+    padding: 10px 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
+    position: relative;
+    user-select: none;
+}
+.ability-slot:hover:not(.used):not(.empty) {
+    transform: translateY(-4px) scale(1.05);
+    border-color: rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.08);
+}
+.ability-slot:active:not(.used):not(.empty) {
+    transform: scale(0.93);
+}
+.ability-slot.used {
+    filter: grayscale(1) brightness(0.35);
+    cursor: not-allowed;
+    transform: none !important;
+}
+.ability-slot.empty {
+    opacity: 0.3;
+    cursor: default;
+}
+.ability-slot.active-ability {
+    border-color: #feca57 !important;
+    box-shadow: 0 0 20px rgba(254,202,87,0.45);
+    background: rgba(254,202,87,0.12) !important;
+    animation: abilityActivePulse 1.5s ease-in-out infinite;
+}
+@keyframes abilityActivePulse {
+    0%,100% { box-shadow: 0 0 20px rgba(254,202,87,0.45); }
+    50% { box-shadow: 0 0 35px rgba(254,202,87,0.7); }
+}
+.ability-icon { font-size: 1.4rem; margin-bottom: 3px; display: block; }
+.ability-name { font-size: 0.6rem; font-weight: 700; color: rgba(255,255,255,0.7); letter-spacing: 0.3px; line-height: 1.2; }
+.ability-rarity {
+    position: absolute;
+    top: -6px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.52rem;
+    font-weight: 900;
+    padding: 1px 6px;
+    border-radius: 8px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.rarity-common { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.6); }
+.rarity-rare { background: rgba(72,219,251,0.3); color: #48dbfb; border: 1px solid rgba(72,219,251,0.4); }
+.rarity-epic { background: rgba(163,84,255,0.3); color: #c39eff; border: 1px solid rgba(163,84,255,0.4); }
+.rarity-legendary { background: linear-gradient(90deg,rgba(255,107,107,0.4),rgba(254,202,87,0.4)); color: #feca57; border: 1px solid rgba(254,202,87,0.5); }
+
+/* ══════════════════════════════════════
+   SHOP MODAL
+══════════════════════════════════════ */
+#shopModal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.88);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 5000;
+    padding: 16px;
+    backdrop-filter: blur(6px);
+}
+#shopModal.active { display: flex; }
+.shop-panel {
+    background: linear-gradient(160deg, #1a0a30 0%, #0f0f1a 100%);
+    border-radius: 24px;
+    padding: 22px;
+    width: 100%;
+    max-width: 420px;
+    max-height: 88vh;
+    overflow-y: auto;
+    border: 1px solid rgba(254,202,87,0.2);
+    box-shadow: 0 0 60px rgba(107,47,160,0.4), 0 20px 60px rgba(0,0,0,0.6);
+    animation: shopSlideIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes shopSlideIn {
+    from { opacity: 0; transform: translateY(30px) scale(0.93); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.shop-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.shop-title {
+    font-size: 1.3rem;
+    font-weight: 800;
+    background: linear-gradient(45deg, #feca57, #ff6b6b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.shop-ap-display {
+    background: rgba(254,202,87,0.15);
+    border: 1px solid rgba(254,202,87,0.4);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #feca57;
+}
+.shop-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.shop-item {
+    background: rgba(255,255,255,0.04);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 14px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
+    position: relative;
+}
+.shop-item:hover:not(.cant-afford):not(.owned) {
+    transform: translateY(-4px) scale(1.03);
+    border-color: rgba(254,202,87,0.5);
+    background: rgba(254,202,87,0.06);
+    box-shadow: 0 8px 25px rgba(254,202,87,0.2);
+}
+.shop-item.cant-afford { opacity: 0.4; cursor: not-allowed; }
+.shop-item.owned { border-color: var(--green); background: rgba(46,204,113,0.08); cursor: default; }
+.shop-item .s-icon { font-size: 1.8rem; margin-bottom: 6px; display: block; }
+.shop-item .s-name { font-size: 0.78rem; font-weight: 700; margin-bottom: 3px; }
+.shop-item .s-desc { font-size: 0.62rem; color: var(--muted); line-height: 1.3; margin-bottom: 6px; }
+.shop-item .s-cost {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #feca57;
+    background: rgba(254,202,87,0.12);
+    border-radius: 8px;
+    padding: 2px 8px;
+    display: inline-block;
+}
+.shop-item.owned .s-cost { color: var(--green); background: rgba(46,204,113,0.12); }
+
+/* Underdog badge */
+.underdog-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(255,71,87,0.3), rgba(107,47,160,0.3));
+    border: 1px solid rgba(255,71,87,0.4);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #ff4757;
+    margin-bottom: 12px;
+    text-align: center;
+    width: 100%;
+}
+
+/* ══════════════════════════════════════
+   LOOT BOX MODAL
+══════════════════════════════════════ */
+#lootBoxModal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.92);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 6000;
+    padding: 20px;
+}
+#lootBoxModal.active { display: flex; }
+.lootbox-panel {
+    background: linear-gradient(160deg, #1a0030 0%, #0a0a1a 100%);
+    border-radius: 28px;
+    padding: 30px 24px;
+    width: 100%;
+    max-width: 360px;
+    text-align: center;
+    border: 2px solid rgba(163,84,255,0.5);
+    box-shadow: 0 0 80px rgba(163,84,255,0.4), 0 0 160px rgba(163,84,255,0.15);
+    animation: lootSlideIn 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes lootSlideIn {
+    from { opacity: 0; transform: scale(0.7) rotate(-5deg); }
+    to   { opacity: 1; transform: scale(1) rotate(0); }
+}
+.lootbox-box {
+    font-size: 5rem;
+    animation: lootBoxFloat 1s ease-in-out infinite alternate;
+    display: inline-block;
+    cursor: pointer;
+    filter: drop-shadow(0 0 20px rgba(163,84,255,0.8));
+}
+@keyframes lootBoxFloat {
+    from { transform: translateY(0) rotate(-3deg) scale(1); }
+    to   { transform: translateY(-12px) rotate(3deg) scale(1.08); }
+}
+.lootbox-title { font-size: 1.3rem; font-weight: 800; color: #c39eff; margin: 12px 0 4px; }
+.lootbox-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 16px; }
+.lootbox-reveal {
+    display: none;
+    animation: revealPop 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes revealPop {
+    from { transform: scale(0); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+}
+.lootbox-ability-card {
+    background: linear-gradient(135deg, rgba(163,84,255,0.2), rgba(107,47,160,0.1));
+    border: 2px solid rgba(163,84,255,0.5);
+    border-radius: 20px;
+    padding: 20px;
+    margin-top: 12px;
+}
+.lootbox-ability-icon { font-size: 3rem; margin-bottom: 8px; display: block; }
+.lootbox-ability-name { font-size: 1.2rem; font-weight: 800; margin-bottom: 4px; }
+.lootbox-ability-desc { font-size: 0.82rem; color: var(--muted); }
+
+/* ══════════════════════════════════════
+   ABILITY USED OVERLAY
+══════════════════════════════════════ */
+.ability-used-toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%,-50%);
+    z-index: 9000;
+    text-align: center;
+    pointer-events: none;
+}
+.ability-used-icon { font-size: 4rem; animation: abilityUsedPop 0.5s cubic-bezier(0.34,1.56,0.64,1); display: block; }
+.ability-used-name { font-size: 1.1rem; font-weight: 800; color: #fff; animation: abilityUsedFade 1.5s ease forwards; }
+@keyframes abilityUsedPop {
+    0%   { transform: scale(0) rotate(-20deg); }
+    60%  { transform: scale(1.3) rotate(5deg); }
+    100% { transform: scale(1) rotate(0); }
+}
+@keyframes abilityUsedFade {
+    0%   { opacity: 1; transform: translateY(0); }
+    70%  { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-20px); }
+}
+
+/* ══════════════════════════════════════
+   STREAK NOTIFICATION
+══════════════════════════════════════ */
+.streak-banner {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-120px);
+    background: linear-gradient(135deg, #ff6b6b, #feca57);
+    color: #1a0a10;
+    border-radius: 50px;
+    padding: 10px 24px;
+    font-size: 0.9rem;
+    font-weight: 900;
+    z-index: 8000;
+    transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    white-space: nowrap;
+    box-shadow: 0 8px 30px rgba(255,107,107,0.5);
+}
+.streak-banner.show { transform: translateX(-50%) translateY(0); }
+
+/* ══════════════════════════════════════
+   SHOP OPEN BUTTON — floats in voter view
+══════════════════════════════════════ */
+#shopOpenBtn {
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    background: linear-gradient(135deg, rgba(163,84,255,0.3), rgba(107,47,160,0.2));
+    border: 1px solid rgba(163,84,255,0.4);
+    border-radius: 50px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #c39eff;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: 0;
+    margin: 0;
+    transition: all 0.2s ease;
+}
+#shopOpenBtn:hover { background: rgba(163,84,255,0.4); box-shadow: 0 4px 20px rgba(163,84,255,0.3); transform: translateY(-2px); }
+.shop-btn-ap { color: #feca57; font-size: 0.85rem; }
+</style>
+
+<!-- SHOP MODAL HTML -->
+<div id="shopModal">
+    <div class="shop-panel" onclick="event.stopPropagation()">
+        <div class="shop-header">
+            <div class="shop-title">🛒 Ability Shop</div>
+            <div class="shop-ap-display">⚡ <span id="shopApDisplay">0</span> AP</div>
+        </div>
+        <div id="underdogNotice" class="underdog-badge" style="display:none;">
+            🛡️ You're the underdog — 50% discount active!
+        </div>
+        <div class="shop-grid" id="shopGrid"></div>
+        <button onclick="closeShop()" class="btn-secondary" style="margin-top:4px;">Close</button>
+    </div>
+</div>
+
+<!-- LOOT BOX MODAL HTML -->
+<div id="lootBoxModal">
+    <div class="lootbox-panel">
+        <div class="lootbox-box" id="lootBoxIcon" onclick="openLootBox()">📦</div>
+        <div class="lootbox-title">Mystery Box!</div>
+        <div class="lootbox-sub" id="lootBoxSub">Tap to open your reward</div>
+        <div class="lootbox-reveal" id="lootBoxReveal">
+            <div class="lootbox-ability-card">
+                <span class="lootbox-ability-icon" id="lootBoxAbilityIcon">✨</span>
+                <div class="lootbox-ability-name" id="lootBoxAbilityName"></div>
+                <div class="lootbox-ability-desc" id="lootBoxAbilityDesc"></div>
+            </div>
+            <button onclick="closeLootBox()" class="btn-primary" style="margin-top:16px;">Claim It!</button>
+        </div>
+    </div>
+</div>
+
+<div id="streakBanner" class="streak-banner"></div>
+
+<script>
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║                   ABILITY SYSTEM CORE                      ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+
+/* ── ABILITY DEFINITIONS (balanced: 40% off / 30% def / 20% chaos / 10% rare) ── */
+const ABILITIES = {
+    // ── OFFENSIVE (4) ──
+    triple_threat: {
+        id: 'triple_threat', icon: '💥', name: 'Triple Threat',
+        desc: 'Your vote counts as 3 this round',
+        rarity: 'rare', cost: 80, type: 'offensive',
+        useTiming: 'before_vote'
+    },
+    marked_target: {
+        id: 'marked_target', icon: '🎯', name: 'Marked Target',
+        desc: "If others also guess your target → +1 bonus point each",
+        rarity: 'common', cost: 40, type: 'offensive',
+        useTiming: 'before_vote'
+    },
+    curse: {
+        id: 'curse', icon: '🔥', name: 'Curse',
+        desc: 'Pick a player — if they get voted this round, they lose 1 pt',
+        rarity: 'rare', cost: 70, type: 'offensive',
+        useTiming: 'before_vote', needsTarget: true
+    },
+    anon_strike: {
+        id: 'anon_strike', icon: '🕶️', name: 'Anonymous',
+        desc: 'Your vote is hidden in results — nobody knows it was you',
+        rarity: 'common', cost: 35, type: 'offensive',
+        useTiming: 'before_vote'
+    },
+    // ── DEFENSIVE (3) ──
+    immunity: {
+        id: 'immunity', icon: '🛡️', name: 'Immunity',
+        desc: "You can't be voted this round — removed from options",
+        rarity: 'rare', cost: 75, type: 'defensive',
+        useTiming: 'before_vote'
+    },
+    reflect: {
+        id: 'reflect', icon: '🪞', name: 'Reflect',
+        desc: "Any player who votes for you — gets that vote reflected back onto them",
+        rarity: 'epic', cost: 100, type: 'defensive',
+        useTiming: 'before_vote'
+    },
+    second_chance: {
+        id: 'second_chance', icon: '❤️', name: 'Second Chance',
+        desc: "If you lose a point this round — cancel it",
+        rarity: 'common', cost: 45, type: 'defensive',
+        useTiming: 'before_vote'
+    },
+    // ── CHAOS (2) ──
+    vote_shuffle: {
+        id: 'vote_shuffle', icon: '🔀', name: 'Vote Shuffle',
+        desc: 'Randomly swaps ALL votes before reveal — pure chaos',
+        rarity: 'epic', cost: 90, type: 'chaos',
+        useTiming: 'before_reveal', instigatorOnly: false
+    },
+    dice_roll: {
+        id: 'dice_roll', icon: '🎲', name: 'Dice Roll',
+        desc: 'Random effect: ×2 pts / −1 pt / steal 1 pt / nothing',
+        rarity: 'common', cost: 30, type: 'chaos',
+        useTiming: 'before_vote'
+    },
+    // ── RARE (1) ──
+    kingmaker: {
+        id: 'kingmaker', icon: '👑', name: 'Kingmaker',
+        desc: 'Choose who wins this round — they get the points instead',
+        rarity: 'legendary', cost: 150, type: 'rare',
+        useTiming: 'before_reveal', needsTarget: true
+    }
+};
+
+/* Shop rotation — 4 random abilities shown each round */
+const SHOP_POOL = Object.keys(ABILITIES);
+
+/* ── ABILITY POINTS state (per player, local + synced via room metadata) ── */
+const AP = {
+    points: {},         // playerId → AP amount
+    inventory: {},      // playerId → [abilityId, ...]  (owned but unused)
+    activeThisRound: {}, // playerId → {abilityId, params}
+    streaks: {},        // playerId → consecutive correct vote count
+    lootboxPending: null, // ability to give after modal closes
+
+    get myAP() { return AP.points[state.currentUser?.id] || 0; },
+    get myInventory() { return AP.inventory[state.currentUser?.id] || []; },
+
+    addAP(playerId, amount) {
+        AP.points[playerId] = (AP.points[playerId] || 0) + amount;
+        AP.renderBar();
+    },
+    spendAP(amount) {
+        const me = state.currentUser?.id;
+        AP.points[me] = Math.max(0, (AP.points[me] || 0) - amount);
+        AP.renderBar();
+    },
+    giveAbility(playerId, abilityId) {
+        if (!AP.inventory[playerId]) AP.inventory[playerId] = [];
+        // Max 4 ability slots
+        if (AP.inventory[playerId].length >= 4) {
+            AP.inventory[playerId].shift(); // drop oldest if full
+        }
+        AP.inventory[playerId].push(abilityId);
+        AP.renderTray();
+    },
+    activateAbility(abilityId, params = {}) {
+        const me = state.currentUser?.id;
+        AP.activeThisRound[me] = { abilityId, params };
+        // Remove from inventory
+        const inv = AP.inventory[me] || [];
+        const idx = inv.indexOf(abilityId);
+        if (idx > -1) inv.splice(idx, 1);
+        AP.inventory[me] = inv;
+        AP.renderTray();
+        AP.showUsedEffect(abilityId);
+    },
+    getMyActive() {
+        return AP.activeThisRound[state.currentUser?.id] || null;
+    },
+    resetRound() {
+        // Don't clear inventory, only clear active flags
+        AP.activeThisRound = {};
+        AP.renderTray();
+        AP.renderBar();
+    },
+
+    /* ── Render AP bar below scoreboard ── */
+    renderBar() {
+        let bar = document.getElementById('apBar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'apBar';
+            const scoreboard = document.getElementById('scoreboard');
+            if (scoreboard) scoreboard.after(bar);
+        }
+        const myId = state.currentUser?.id;
+        bar.innerHTML = state.players.map(p => {
+            const ap = AP.points[p.id] || 0;
+            const isMe = p.id === myId;
+            return `<div class="ap-chip ${isMe ? 'me' : ''}">
+                ⚡ <span class="ap-num">${ap}</span> ${p.name.split(' ')[0]}
+            </div>`;
+        }).join('');
+    },
+
+    /* ── Render ability tray in voter view ── */
+    renderTray() {
+        let tray = document.getElementById('abilityTray');
+        if (!tray) return;
+        const myId = state.currentUser?.id;
+        const inv = AP.inventory[myId] || [];
+
+        // 4 slots
+        const slots = [0,1,2,3].map(i => {
+            const abilId = inv[i];
+            if (!abilId) return `<div class="ability-slot empty"><span class="ability-icon" style="opacity:0.2">🔳</span><div class="ability-name" style="opacity:0.3">Empty</div></div>`;
+            const ab = ABILITIES[abilId];
+            const rarityClass = `rarity-${ab.rarity}`;
+            const isActive = AP.activeThisRound[myId]?.abilityId === abilId;
+            return `<div class="ability-slot ${isActive ? 'active-ability' : ''}" onclick="useAbility('${abilId}')" title="${ab.desc}">
+                <span class="ability-rarity ${rarityClass}">${ab.rarity}</span>
+                <span class="ability-icon">${ab.icon}</span>
+                <div class="ability-name">${ab.name}</div>
+            </div>`;
+        }).join('');
+
+        tray.querySelector('.ability-slots').innerHTML = slots;
+    },
+
+    /* ── Floating "ability used" effect ── */
+    showUsedEffect(abilityId) {
+        const ab = ABILITIES[abilityId];
+        if (!ab) return;
+        const el = document.createElement('div');
+        el.className = 'ability-used-toast';
+        el.innerHTML = `<span class="ability-used-icon">${ab.icon}</span><div class="ability-used-name">${ab.name} activated!</div>`;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 2000);
+        haptic([20, 10, 30]);
+    }
+};
+
+/* ── Ability tray in voter view HTML injection ── */
+function injectAbilityTray() {
+    if (document.getElementById('abilityTray')) return;
+    const votingSection = document.getElementById('votingSection');
+    if (!votingSection) return;
+    const tray = document.createElement('div');
+    tray.id = 'abilityTray';
+    tray.innerHTML = `
+        <h4>⚡ Your Abilities <span id="myApLabel">0 AP</span>
+            <button id="shopOpenBtn" onclick="openShop()">🛒 Shop</button>
+        </h4>
+        <div class="ability-slots"></div>
+    `;
+    // Insert after votingSection
+    votingSection.after(tray);
+    AP.renderTray();
+}
+
+/* ══════════════════════════════════════
+   USE ABILITY
+══════════════════════════════════════ */
+function useAbility(abilityId) {
+    const ab = ABILITIES[abilityId];
+    if (!ab) return;
+    const myId = state.currentUser?.id;
+    const inv = AP.inventory[myId] || [];
+    if (!inv.includes(abilityId)) return;
+
+    // Abilities needing target open a picker
+    if (ab.needsTarget) {
+        showAbilityTargetPicker(abilityId);
+        return;
+    }
+
+    // Kingmaker / Vote Shuffle active before reveal — just mark
+    if (ab.useTiming === 'before_reveal') {
+        AP.activateAbility(abilityId);
+        showToast(`${ab.icon} ${ab.name} queued — activates at reveal!`);
+        return;
+    }
+
+    // Dice Roll — resolve immediately
+    if (abilityId === 'dice_roll') {
+        resolveDiceRoll();
+        AP.activateAbility(abilityId);
+        return;
+    }
+
+    AP.activateAbility(abilityId);
+    showToast(`${ab.icon} ${ab.name} is active this round!`);
+}
+
+function showAbilityTargetPicker(abilityId) {
+    const ab = ABILITIES[abilityId];
+    const targets = state.players.filter(p => p.id !== state.currentUser?.id);
+    const modal = document.createElement('div');
+    modal.id = 'abilityTargetModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;z-index:7000;padding:20px;backdrop-filter:blur(4px);';
+    modal.innerHTML = `
+        <div style="background:linear-gradient(160deg,#1a0030,#0f0f1a);border-radius:22px;padding:24px;width:100%;max-width:360px;border:1px solid rgba(163,84,255,0.4);">
+            <div style="font-size:2rem;text-align:center;margin-bottom:8px;">${ab.icon}</div>
+            <h3 style="text-align:center;color:#feca57;margin-bottom:6px;">${ab.name}</h3>
+            <p style="text-align:center;color:#8a8a9a;font-size:0.82rem;margin-bottom:16px;">${ab.desc}</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                ${targets.map(p => `
+                    <div onclick="confirmAbilityTarget('${abilityId}','${p.id}',this)"
+                         style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px;text-align:center;cursor:pointer;transition:all 0.2s;">
+                        <div style="width:36px;height:36px;border-radius:50%;${avatarColor(p.name)};display:flex;align-items:center;justify-content:center;font-weight:bold;color:#fff;margin:0 auto 6px;">${p.name[0].toUpperCase()}</div>
+                        <div style="font-size:0.85rem;font-weight:700;">${p.name}</div>
+                    </div>
+                `).join('')}
+            </div>
+            <button onclick="document.getElementById('abilityTargetModal').remove()" class="btn-secondary" style="margin-top:14px;">Cancel</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function confirmAbilityTarget(abilityId, targetId, el) {
+    document.querySelectorAll('#abilityTargetModal [onclick*="confirmAbilityTarget"]').forEach(e => {
+        e.style.borderColor = 'rgba(255,255,255,0.1)';
+        e.style.background = 'rgba(255,255,255,0.05)';
+    });
+    el.style.borderColor = '#2ecc71';
+    el.style.background = 'rgba(46,204,113,0.15)';
+
+    setTimeout(() => {
+        document.getElementById('abilityTargetModal')?.remove();
+        AP.activateAbility(abilityId, { targetId });
+        const ab = ABILITIES[abilityId];
+        const targetName = state.players.find(p => p.id === targetId)?.name || '?';
+        showToast(`${ab.icon} ${ab.name} set on ${targetName}!`);
+    }, 400);
+}
+
+function resolveDiceRoll() {
+    const myId = state.currentUser?.id;
+    const roll = Math.floor(Math.random() * 4);
+    const outcomes = [
+        { msg: '🎲 Double points this round!', effect: () => { AP.diceBonus = 2; } },
+        { msg: '🎲 -1 point this round!', effect: () => { AP.diceBonus = -1; } },
+        { msg: '🎲 +20 AP bonus!', effect: () => AP.addAP(myId, 20) },
+        { msg: '🎲 Nothing happened… lucky?', effect: () => {} }
+    ];
+    const chosen = outcomes[roll];
+    showToast(chosen.msg, 4000);
+    chosen.effect();
+}
+
+/* ══════════════════════════════════════
+   SHOP
+══════════════════════════════════════ */
+let _shopRotation = [];
+function getShopRotation() {
+    // Rotate 5 abilities per round, seeded by round number
+    const seed = (state.round || 1) * 7;
+    const pool = [...SHOP_POOL];
+    const result = [];
+    let s = seed;
+    while (result.length < 6 && pool.length > 0) {
+        s = (s * 1103515245 + 12345) & 0x7fffffff;
+        const idx = s % pool.length;
+        result.push(pool.splice(idx, 1)[0]);
+    }
+    return result;
+}
+
+function openShop() {
+    const myId = state.currentUser?.id;
+    const myAP = AP.points[myId] || 0;
+
+    // Underdog: lowest score gets 50% discount
+    const scores = Object.entries(state.scores || {});
+    const minScore = scores.length ? Math.min(...scores.map(([,s]) => s)) : 0;
+    const myScore = state.scores[myId] || 0;
+    const isUnderdog = myScore <= minScore && scores.length > 1;
+
+    document.getElementById('shopApDisplay').textContent = myAP;
+    document.getElementById('underdogNotice').style.display = isUnderdog ? 'block' : 'none';
+
+    const rotation = getShopRotation();
+    const myInv = AP.inventory[myId] || [];
+    const grid = document.getElementById('shopGrid');
+
+    grid.innerHTML = rotation.map(abilId => {
+        const ab = ABILITIES[abilId];
+        if (!ab) return '';
+        const baseCost = ab.cost;
+        const cost = isUnderdog ? Math.floor(baseCost * 0.5) : baseCost;
+        const owned = myInv.includes(abilId);
+        const cantAfford = !owned && myAP < cost;
+        return `
+            <div class="shop-item ${owned ? 'owned' : cantAfford ? 'cant-afford' : ''}"
+                 onclick="buyAbility('${abilId}', ${cost})">
+                <span class="ability-rarity rarity-${ab.rarity}" style="position:static;display:inline-block;margin-bottom:6px;">${ab.rarity}</span>
+                <span class="s-icon">${ab.icon}</span>
+                <div class="s-name">${ab.name}</div>
+                <div class="s-desc">${ab.desc}</div>
+                <div class="s-cost">${owned ? '✓ Owned' : `⚡ ${cost} AP`}</div>
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('shopModal').classList.add('active');
+}
+
+function buyAbility(abilityId, cost) {
+    const myId = state.currentUser?.id;
+    const myAP = AP.points[myId] || 0;
+    const inv = AP.inventory[myId] || [];
+
+    if (inv.includes(abilityId)) { showToast('Already owned!'); return; }
+    if (myAP < cost) { showToast('Not enough AP! Keep guessing correctly.'); return; }
+
+    AP.spendAP(cost);
+    AP.giveAbility(myId, abilityId);
+    closeShop();
+    const ab = ABILITIES[abilityId];
+    showToast(`${ab.icon} ${ab.name} added to your tray!`);
+    haptic([15, 25, 15]);
+}
+
+function closeShop() {
+    document.getElementById('shopModal').classList.remove('active');
+    AP.renderTray();
+}
+
+/* ══════════════════════════════════════
+   LOOT BOX
+══════════════════════════════════════ */
+function showLootBox(abilityId) {
+    AP.lootboxPending = abilityId;
+    const modal = document.getElementById('lootBoxModal');
+    document.getElementById('lootBoxIcon').textContent = '📦';
+    document.getElementById('lootBoxReveal').style.display = 'none';
+    document.getElementById('lootBoxSub').textContent = 'Tap the box to open your reward!';
+    modal.classList.add('active');
+}
+
+function openLootBox() {
+    const abilityId = AP.lootboxPending;
+    if (!abilityId) return;
+    const ab = ABILITIES[abilityId];
+    document.getElementById('lootBoxIcon').textContent = '✨';
+    document.getElementById('lootBoxIcon').style.animation = 'none';
+    document.getElementById('lootBoxAbilityIcon').textContent = ab.icon;
+    document.getElementById('lootBoxAbilityName').textContent = ab.name;
+    document.getElementById('lootBoxAbilityDesc').textContent = ab.desc;
+    document.getElementById('lootBoxReveal').style.display = 'block';
+    haptic([20, 40, 20, 60]);
+    launchConfetti();
+}
+
+function closeLootBox() {
+    const abilityId = AP.lootboxPending;
+    AP.lootboxPending = null;
+    document.getElementById('lootBoxModal').classList.remove('active');
+    if (abilityId) {
+        const myId = state.currentUser?.id;
+        AP.giveAbility(myId, abilityId);
+        const ab = ABILITIES[abilityId];
+        showToast(`${ab.icon} ${ab.name} added to your tray!`);
+    }
+}
+
+function getLootBoxAbility() {
+    // 60% common, 25% rare, 12% epic, 3% legendary
+    const r = Math.random();
+    let pool;
+    if (r < 0.03)      pool = Object.values(ABILITIES).filter(a => a.rarity === 'legendary');
+    else if (r < 0.15) pool = Object.values(ABILITIES).filter(a => a.rarity === 'epic');
+    else if (r < 0.40) pool = Object.values(ABILITIES).filter(a => a.rarity === 'rare');
+    else               pool = Object.values(ABILITIES).filter(a => a.rarity === 'common');
+    if (!pool.length) pool = Object.values(ABILITIES);
+    return pool[Math.floor(Math.random() * pool.length)].id;
+}
+
+/* ══════════════════════════════════════
+   STREAK TRACKER + REWARDS
+══════════════════════════════════════ */
+function showStreakBanner(text) {
+    const el = document.getElementById('streakBanner');
+    el.textContent = text;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function handleStreakRewards(playerId, wasCorrect) {
+    if (!AP.streaks[playerId]) AP.streaks[playerId] = 0;
+    if (wasCorrect) {
+        AP.streaks[playerId]++;
+        const streak = AP.streaks[playerId];
+        const isMe = playerId === state.currentUser?.id;
+
+        // AP per correct guess
+        AP.addAP(playerId, 10);
+
+        if (isMe) {
+            if (streak === 3) {
+                showStreakBanner('🔥 3 correct in a row! Random ability!');
+                setTimeout(() => showLootBox(getLootBoxAbility()), 1200);
+            } else if (streak === 5) {
+                showStreakBanner('💥 5 STREAK! Rare ability incoming!');
+                const rarePool = Object.values(ABILITIES).filter(a => a.rarity === 'rare' || a.rarity === 'epic');
+                const ab = rarePool[Math.floor(Math.random() * rarePool.length)];
+                setTimeout(() => showLootBox(ab.id), 1200);
+            } else if (streak === 6) {
+                showStreakBanner('👑 6 STREAK! LEGENDARY ABILITY!');
+                const legendPool = Object.values(ABILITIES).filter(a => a.rarity === 'legendary');
+                const ab = legendPool[Math.floor(Math.random() * legendPool.length)];
+                setTimeout(() => showLootBox(ab.id), 1200);
+            } else if (streak >= 2) {
+                showStreakBanner(`🔥 ${streak}x Streak! +10 AP bonus`);
+            }
+        }
+    } else {
+        AP.streaks[playerId] = 0;
+    }
+}
+
+/* ══════════════════════════════════════
+   UNDERDOG FREE SHIELD
+══════════════════════════════════════ */
+function checkUnderdogReward() {
+    const myId = state.currentUser?.id;
+    if (!myId || !state.scores) return;
+    const scores = Object.entries(state.scores);
+    if (scores.length < 2) return;
+    const minScore = Math.min(...scores.map(([,s]) => s));
+    const myScore = state.scores[myId] || 0;
+    const isUnderdog = myScore <= minScore;
+    const inv = AP.inventory[myId] || [];
+    if (isUnderdog && !inv.includes('immunity') && !inv.includes('second_chance')) {
+        // Give free Second Chance to underdog
+        AP.giveAbility(myId, 'second_chance');
+        showToast('🛡️ Underdog bonus: Free Second Chance ability!', 4000);
+    }
+}
+
+/* ══════════════════════════════════════
+   LOOT BOX EVERY 3 ROUNDS
+══════════════════════════════════════ */
+function checkLootBoxDrop() {
+    if (!state.round) return;
+    if (state.round % 3 === 0) {
+        setTimeout(() => showLootBox(getLootBoxAbility()), 1800);
+    }
+}
+
+/* ══════════════════════════════════════
+   PATCH revealVotes TO APPLY ABILITIES
+══════════════════════════════════════ */
+const _origRevealVotes = window.revealVotes;
+window.revealVotes = async function() {
+    // Apply Vote Shuffle before reveal
+    const myId = state.currentUser?.id;
+    const myActive = AP.activeThisRound[myId];
+
+    if (myActive?.abilityId === 'vote_shuffle') {
+        // Randomly shuffle votes (client-side chaos display)
+        const voterIds = Object.keys(state.votes).filter(id => id !== state.currentReader);
+        const targets = voterIds.map(id => state.votes[id].target);
+        for (let i = targets.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [targets[i], targets[j]] = [targets[j], targets[i]];
+        }
+        voterIds.forEach((id, i) => {
+            if (state.votes[id]) state.votes[id].target = targets[i];
+        });
+        showToast('🔀 Vote Shuffle activated — chaos reigns!', 3000);
+    }
+
+    // Apply Triple Threat: submit vote with weight=3 (client-side bonus)
+    // We track this in active abilities and handle in score calculation below
+
+    return _origRevealVotes.apply(this, arguments);
+};
+
+/* ══════════════════════════════════════
+   PATCH showResults TO SHOW AP GAINS + APPLY ABILITIES
+══════════════════════════════════════ */
+const _origShowResults = window.showResults;
+window.showResults = function() {
+    _origShowResults.apply(this, arguments);
+
+    // Apply ability effects and calculate AP rewards
+    const myId = state.currentUser?.id;
+    const voterEntries = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
+    const instigatorTarget = state.instigatorVote;
+    const anyMatched = voterEntries.some(([, v]) => v.target === instigatorTarget);
+
+    let majorityTargetId = null;
+    if (!anyMatched) {
+        const voteCounts = {};
+        voterEntries.forEach(([, v]) => { voteCounts[v.target] = (voteCounts[v.target] || 0) + 1; });
+        let maxVotes = 0;
+        Object.entries(voteCounts).forEach(([target, count]) => {
+            if (count > maxVotes) { maxVotes = count; majorityTargetId = target; }
+        });
+    }
+
+    // Handle each player's result
+    voterEntries.forEach(([voterId, vote]) => {
+        const correct = anyMatched
+            ? vote.target === instigatorTarget
+            : vote.target === majorityTargetId;
+        handleStreakRewards(voterId, correct);
+    });
+
+    // Apply Curse ability
+    voterEntries.forEach(([voterId]) => {
+        const active = AP.activeThisRound[voterId];
+        if (active?.abilityId === 'curse') {
+            const cursedId = active.params.targetId;
+            const cursedPlayer = state.players.find(p => p.id === cursedId);
+            if (cursedPlayer) {
+                showToast(`🔥 Curse hit ${cursedPlayer.name}! (-1 pt)`, 3000);
+            }
+        }
+    });
+
+    // Apply Marked Target
+    voterEntries.forEach(([voterId, vote]) => {
+        const active = AP.activeThisRound[voterId];
+        if (active?.abilityId === 'marked_target') {
+            // Count others who voted same target
+            const sameVoters = voterEntries.filter(([oid, ov]) => oid !== voterId && ov.target === vote.target).length;
+            if (sameVoters > 0) {
+                AP.addAP(voterId, sameVoters * 10);
+                if (voterId === myId) showToast(`🎯 Marked Target! +${sameVoters * 10} AP bonus!`);
+            }
+        }
+    });
+
+    // Underdog check after round
+    setTimeout(checkUnderdogReward, 500);
+    // Loot box drop
+    setTimeout(checkLootBoxDrop, 1000);
+
+    // Render AP bar
+    setTimeout(() => AP.renderBar(), 200);
+};
+
+/* ══════════════════════════════════════
+   PATCH nextRound TO RESET ABILITIES
+══════════════════════════════════════ */
+const _origNextRound = window.nextRound;
+window.nextRound = async function() {
+    AP.resetRound();
+    AP.diceBonus = null;
+    return _origNextRound.apply(this, arguments);
+};
+
+/* ══════════════════════════════════════
+   PATCH initGameView TO INJECT TRAY
+══════════════════════════════════════ */
+const _origInitGameView4 = window.initGameView;
+window.initGameView = function() {
+    _origInitGameView4.apply(this, arguments);
+    setTimeout(() => {
+        injectAbilityTray();
+        AP.renderBar();
+        AP.renderTray();
+        // Update "my AP" label in tray
+        const lbl = document.getElementById('myApLabel');
+        if (lbl) lbl.textContent = `${AP.myAP} AP`;
+    }, 350);
+};
+
+/* ══════════════════════════════════════
+   PATCH updateVoteOptions FOR IMMUNITY
+══════════════════════════════════════ */
+const _origUpdateVoteOptions = window.updateVoteOptions;
+window.updateVoteOptions = function() {
+    // Filter out immune players
+    const originalPlayers = state.players;
+    const immunePlayers = Object.entries(AP.activeThisRound)
+        .filter(([, a]) => a.abilityId === 'immunity')
+        .map(([id]) => id);
+
+    if (immunePlayers.length > 0) {
+        // Temporarily filter immune players from vote options
+        state.players = state.players.filter(p => !immunePlayers.includes(p.id));
+        _origUpdateVoteOptions.apply(this, arguments);
+        state.players = originalPlayers;
+        if (immunePlayers.includes(state.currentUser?.id)) {
+            showToast('🛡️ Immunity active — you\'re hidden from votes!');
+        }
+    } else {
+        _origUpdateVoteOptions.apply(this, arguments);
+    }
+};
+
+/* ══════════════════════════════════════
+   PATCH startGame TO INIT AP STATE
+══════════════════════════════════════ */
+const _origStartGame = window.startGame;
+window.startGame = async function() {
+    // Init AP for all players
+    state.players.forEach(p => {
+        if (!AP.points[p.id]) AP.points[p.id] = 0;
+        if (!AP.inventory[p.id]) AP.inventory[p.id] = [];
+        AP.streaks[p.id] = 0;
+    });
+    return _origStartGame.apply(this, arguments);
+};
+
+/* Clicking outside shop closes it */
+document.getElementById('shopModal').addEventListener('click', function(e) {
+    if (e.target === this) closeShop();
+});
+
+console.log('⚡ Ability System loaded — 10 abilities, shop, loot box, streaks, underdog protection');
+</script>
         
 </body>
 </html>
