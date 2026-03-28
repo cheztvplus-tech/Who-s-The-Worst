@@ -360,7 +360,7 @@
         .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
         .action-buttons button { flex:1; min-width:120px; margin-bottom: 0; }
 
-        /* ===== DOUBLE DOWN POKER CARD ===== */
+        /* ===== DOUBLE PLAY CARD ===== */
         .double-down-section { text-align: center; margin-bottom: 22px; }
 
         .poker-card-wrap {
@@ -695,6 +695,7 @@
         }
         #muteBtn:hover { background: rgba(255,255,255,0.18); }
     </style>
+<base target="_blank">
 </head>
 <body>
     <canvas id="confettiCanvas"></canvas>
@@ -741,7 +742,7 @@
                     <li>Wait for 3+ players to join</li>
                     <li>Read the question and vote for who fits best</li>
                     <li>Guess the <span class="highlight">majority vote</span> to earn points</li>
-                    <li>Use <span class="highlight">Double Down</span> once for 2x points!</li>
+                    <li>Use <span class="highlight">Double Play</span> once for 2x points!</li>
                     <li>First to <span class="highlight">7 points</span> wins</li>
                 </ol>
             </div>
@@ -862,9 +863,9 @@
                     <div class="status-bar" id="startStatus">
                         Need at least 3 players to start
                     </div>
-                    <!-- Double Down Penalty Setting -->
+                    <!-- Double Play Penalty Setting -->
                     <div id="penaltySettingBox" style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 14px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.1);">
-                        <div style="color: #feca57; font-size: 0.85rem; font-weight: bold; margin-bottom: 10px;">🚀 Double Down Penalty (Wrong guess):</div>
+                        <div style="color: #feca57; font-size: 0.85rem; font-weight: bold; margin-bottom: 10px;">🚀 Double Play Penalty (Wrong guess):</div>
                         <div style="display: flex; gap: 8px;">
                             <div onclick="setPenalty('lose_card')" id="penaltyLoseCard" class="penalty-option selected" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid #ff6b6b; background:rgba(255,107,107,0.12); cursor:pointer; text-align:center;">
                                 <div style="font-size:1.2rem;">🃏</div>
@@ -939,7 +940,7 @@
                             <div class="poker-card-face">
                                 <div class="card-corner tl">2x<br>♠</div>
                                 <div class="card-center-suit">🃏</div>
-                                <div class="card-label-text">Double<br>Down</div>
+                                <div class="card-label-text">Double<br>Play</div>
                                 <div class="card-corner br">2x<br>♠</div>
                             </div>
                         </div>
@@ -1015,7 +1016,7 @@
                 <li>Once everyone has voted, the Instigator reveals all votes.</li>
                 <li>Players matching the Instigator's vote get <strong>1 point</strong>.</li>
                 <li>If nobody guesses correctly, the <strong>majority vote</strong> gets 1 point AND the <strong>Instigator</strong> also gets 1 point.</li>
-                <li><strong>Double Down:</strong> Use once per game (or every round if host allows). Correct = 2 points, Wrong = lose card (or -2 pts in harsh mode).</li>
+                <li><strong>Double Play:</strong> Use once per game (or every round if host allows). Correct = 2 points, Wrong = lose card (or -2 pts in harsh mode).</li>
                 <li>Next round: New Instigator goes round-robin.</li>
             </ol>
             <button class="btn-secondary close-rules" onclick="hideRules()">Got it</button>
@@ -1054,12 +1055,12 @@
 
     const SOUNDS = {
         cardFlip:    new Audio(SOUND_BASE + 'card-flip.opus'),
-        click:       new Audio(SOUND_BASE + 'click.opus'),
+        voteClick:   new Audio(SOUND_BASE + 'vote-click.opus'),
         correct:     new Audio(SOUND_BASE + 'correct-guess.opus'),
         wrong:       new Audio(SOUND_BASE + 'wrong-guess.opus'),
         reveal:      new Audio(SOUND_BASE + 'reveal.opus'),
         win:         new Audio(SOUND_BASE + 'win.opus'),
-        doubleDown:  new Audio(SOUND_BASE + 'double-down.opus'),
+        doubleDown:  new Audio(SOUND_BASE + 'double-play.opus'),
         lost:        new Audio(SOUND_BASE + 'lost.opus'),
         penalty:     new Audio(SOUND_BASE + 'penalty.opus'),
     };
@@ -2225,7 +2226,7 @@
         const isActive = card.classList.toggle('active-card');
         if (isActive) playSound('doubleDown');
         if (label) {
-            label.textContent = isActive ? '🔥 Double Down ACTIVE!' : 'Tap to activate 2× points';
+            label.textContent = isActive ? '🔥 Double Play ACTIVE!' : 'Tap to activate 2× points';
             label.className = 'dd-label' + (isActive ? ' active-label' : '');
         }
     }
@@ -2473,7 +2474,7 @@
                     const points = vote.doubleDown ? 2 : 1;
                     newScores[voterId] = (newScores[voterId] || 0) + points;
                 });
-                // Wrong Double-Downers: apply penalty
+                // Wrong Double-Players: apply penalty
                 wrongDoubleDowners.forEach(([voterId]) => {
                     if (penalty === 'minus_two') {
                         newScores[voterId] = (newScores[voterId] || 0) - 2;
@@ -2605,7 +2606,7 @@
                         // Update local state immediately so the card shows as burned on this client
                         if (voterId === state.currentUser?.id) state.currentUser.double_down_used = true;
                     }
-                    else { penaltyText = '🃏 Lost Double Down'; points = 0; }
+                    else { penaltyText = '🃏 Lost Double Play'; points = 0; }
                 }
             } else {
                 // Majority fallback
@@ -2618,7 +2619,7 @@
                         // Update local state immediately so the card shows as burned on this client
                         if (voterId === state.currentUser?.id) state.currentUser.double_down_used = true;
                     }
-                    else { penaltyText = '🃏 Lost Double Down'; points = 0; }
+                    else { penaltyText = '🃏 Lost Double Play'; points = 0; }
                 }
             }
 
@@ -2627,7 +2628,7 @@
                     <div>
                         <div class="voter-name">${voter?.name || 'Unknown'}</div>
                         <div class="voted-for">guessed → ${target?.name || 'Unknown'}</div>
-                        ${vote.doubleDown ? `<div style="color: #f5576c; font-size: 0.75rem; margin-top: 2px;">🚀 Double Down${penaltyText ? ' · ' + penaltyText : ''}</div>` : (penaltyText ? `<div style="color:#ff4757;font-size:0.75rem;">${penaltyText}</div>` : '')}
+                        ${vote.doubleDown ? `<div style="color: #f5576c; font-size: 0.75rem; margin-top: 2px;">🚀 Double Play${penaltyText ? ' · ' + penaltyText : ''}</div>` : (penaltyText ? `<div style="color:#ff4757;font-size:0.75rem;">${penaltyText}</div>` : '')}
                     </div>
                     <div class="points-earned" style="color:${points > 0 ? '#2ecc71' : points < 0 ? '#ff4757' : '#a0a0a0'}">
                         ${points > 0 ? '+' + points : points < 0 ? points : '0'}
