@@ -1780,7 +1780,7 @@ button:not(#muteBtn):active:not(:disabled) {
                     <li>Read the question and vote for who fits best</li>
                     <li>Guess the <span class="highlight">majority vote</span> to earn points</li>
                     <li>Use <span class="highlight">Double Play</span> once for 2x points!</li>
-                    <li>First to <span class="highlight">7 points</span> wins</li>
+                    <li>First to <span class="highlight">7, 10 or 15 points</span> wins (depending on the host).</li>
                 </ol>
             </div>
             
@@ -1899,6 +1899,24 @@ button:not(#muteBtn):active:not(:disabled) {
                 <div id="hostControls" style="display: none; margin-top: 20px;">
                     <div class="status-bar" id="startStatus">
                         Need at least 3 players to start
+                    </div>
+                    <!-- Points to Win Setting -->
+                    <div id="pointsSettingBox" style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 14px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.1);">
+                        <div style="color: #feca57; font-size: 0.85rem; font-weight: bold; margin-bottom: 10px;">🏆 Points to Win:</div>
+                        <div style="display: flex; gap: 8px;">
+                            <div onclick="setPointsToWin(7)" id="points7" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid #feca57; background:rgba(254,202,87,0.12); cursor:pointer; text-align:center;">
+                                <div style="font-size:1.4rem; font-weight:bold; color:#feca57;">7</div>
+                                <div style="font-size:0.65rem; color:#a0a0a0; margin-top:2px;">Default</div>
+                            </div>
+                            <div onclick="setPointsToWin(10)" id="points10" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); cursor:pointer; text-align:center;">
+                                <div style="font-size:1.4rem; font-weight:bold; color:#fff;">10</div>
+                                <div style="font-size:0.65rem; color:#a0a0a0; margin-top:2px;">Extended</div>
+                            </div>
+                            <div onclick="setPointsToWin(15)" id="points15" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); cursor:pointer; text-align:center;">
+                                <div style="font-size:1.4rem; font-weight:bold; color:#fff;">15</div>
+                                <div style="font-size:0.65rem; color:#a0a0a0; margin-top:2px;">Marathon</div>
+                            </div>
+                        </div>
                     </div>
                     <!-- Double Play Penalty Setting -->
                     <div id="penaltySettingBox" style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 14px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.1);">
@@ -2061,7 +2079,7 @@ button:not(#muteBtn):active:not(:disabled) {
                 <li>Other players vote by guessing who they believe the Instigator chose, not who they'd personally pick.</li>
                 <li>Once everyone has voted, the Instigator reveals all votes.</li>
                 <li>Players matching the Instigator's vote get <strong>1 point</strong>.</li>
-                <li>If nobody guesses correctly, the <strong>majority vote</strong> gets 1 point AND the <strong>Instigator</strong> also gets 1 point.</li>
+                <li>If nobody guesses correctly, the <strong>majority vote</strong> gets 1 point.</li>
                 <li><strong>Double Play:</strong> Use once per game (or every round if host allows). Correct = 2 points, Wrong = lose card (or -2 pts in harsh mode).</li>
                 <li>Next round: New Instigator goes round-robin.</li>
             </ol>
@@ -2325,7 +2343,8 @@ button:not(#muteBtn):active:not(:disabled) {
         round: 1,
         instigatorVote: null,
         instigatorVoteConfirmed: false,
-        doubleDownPenalty: 'lose_card' // 'lose_card' or 'minus_two'
+        doubleDownPenalty: 'lose_card', // 'lose_card' or 'minus_two'
+        pointsToWin: 7
     };
 
     // ==========================================
@@ -2400,6 +2419,7 @@ button:not(#muteBtn):active:not(:disabled) {
                 state.instigatorVote = room.instigator_vote;
                 state.instigatorVoteConfirmed = !!room.instigator_vote;
                 if (room.double_down_penalty) state.doubleDownPenalty = room.double_down_penalty;
+                if (room.points_to_win) { state.pointsToWin = room.points_to_win; CONFIG.POINTS_TO_WIN = room.points_to_win; }
                 if (room.scores) state.scores = room.scores;
                 showScreen('gameScreen');
                 await loadPlayers(room.id);
@@ -2490,6 +2510,18 @@ button:not(#muteBtn):active:not(:disabled) {
     function logoutAdmin() {
         isAdminLoggedIn = false;
         showScreen('joinScreen');
+    }
+
+    function setPointsToWin(pts) {
+        state.pointsToWin = pts;
+        [7, 10, 15].forEach(n => {
+            const el = document.getElementById('points' + n);
+            if (!el) return;
+            const selected = n === pts;
+            el.style.borderColor = selected ? '#feca57' : 'rgba(255,255,255,0.15)';
+            el.style.background = selected ? 'rgba(254,202,87,0.12)' : 'rgba(255,255,255,0.05)';
+            el.querySelector('div').style.color = selected ? '#feca57' : '#fff';
+        });
     }
 
     function setPenalty(type) {
@@ -2796,6 +2828,7 @@ button:not(#muteBtn):active:not(:disabled) {
     state.instigatorVote = room.instigator_vote;
     state.instigatorVoteConfirmed = !!room.instigator_vote;
     if (room.double_down_penalty) state.doubleDownPenalty = room.double_down_penalty;
+    if (room.points_to_win) { state.pointsToWin = room.points_to_win; CONFIG.POINTS_TO_WIN = room.points_to_win; }
         
     if (room.scores) state.scores = room.scores;
     
@@ -2914,6 +2947,7 @@ button:not(#muteBtn):active:not(:disabled) {
                     current_reader: startingReader, 
                     scores: scores,
                     double_down_penalty: state.doubleDownPenalty,
+                    points_to_win: state.pointsToWin || 7,
                     started_at: new Date().toISOString() 
                 })
                 .eq('id', roomId);
@@ -2927,6 +2961,7 @@ button:not(#muteBtn):active:not(:disabled) {
             state.gameState = 'playing';
             state.scores = scores;
             state.doubleDownPenalty = state.doubleDownPenalty || 'lose_card';
+            CONFIG.POINTS_TO_WIN = state.pointsToWin || 7;
 
             showScreen('gameScreen');
             initGameView();
@@ -3162,7 +3197,7 @@ button:not(#muteBtn):active:not(:disabled) {
         const board = document.getElementById('scoreboard');
         const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
         const maxScore = sorted.length > 0 ? sorted[0][1] : 0;
-        const POINTS_TO_WIN = CONFIG.POINTS_TO_WIN || 7;
+        const POINTS_TO_WIN = CONFIG.POINTS_TO_WIN || state.pointsToWin || 7;
 
         board.innerHTML = sorted.map(([playerId, score]) => {
             const player = state.players.find(p => p.id === playerId);
