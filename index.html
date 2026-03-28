@@ -1994,6 +1994,28 @@ button:not(#muteBtn):active:not(:disabled) {
                     Waiting for question...
                 </div>
 
+                <!-- Instigator Banner — always visible to voters -->
+                <div id="instigatorBanner" style="
+                    display: flex; align-items: center; gap: 12px;
+                    background: linear-gradient(135deg, rgba(255,107,107,0.15) 0%, rgba(107,47,160,0.1) 100%);
+                    border: 1px solid rgba(255,107,107,0.35);
+                    border-radius: 16px; padding: 12px 16px; margin-bottom: 16px;
+                    animation: bannerSlideDown 0.35s ease both;
+                ">
+                    <div id="instigatorBannerAvatar" style="
+                        width: 42px; height: 42px; border-radius: 50%;
+                        display: flex; align-items: center; justify-content: center;
+                        font-size: 1.2rem; font-weight: bold; color: #fff; flex-shrink: 0;
+                        border: 2px solid rgba(255,107,107,0.6);
+                        box-shadow: 0 0 14px rgba(255,107,107,0.4);
+                    ">?</div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 0.65rem; color: rgba(255,107,107,0.8); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 2px;">🎯 This Round's Instigator</div>
+                        <div id="instigatorBannerName" style="font-size: 1rem; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">—</div>
+                    </div>
+                    <div style="font-size: 1.6rem;">🔥</div>
+                </div>
+
                 <div class="question-card waiting" id="voterQuestionCard">
                     The reader is drawing a card...
                 </div>
@@ -2974,6 +2996,20 @@ button:not(#muteBtn):active:not(:disabled) {
         }
     }
 
+    function updateInstigatorBanner() {
+        const banner = document.getElementById('instigatorBanner');
+        const avatarEl = document.getElementById('instigatorBannerAvatar');
+        const nameEl = document.getElementById('instigatorBannerName');
+        if (!banner || !avatarEl || !nameEl) return;
+
+        const instigator = state.players.find(p => p.id === state.currentReader);
+        if (!instigator) return;
+
+        avatarEl.style.cssText += '; ' + avatarColor(instigator.name);
+        avatarEl.textContent = instigator.name.charAt(0).toUpperCase();
+        nameEl.textContent = instigator.name;
+    }
+
     function initGameView() {
     console.log('Initializing game view...');
     console.log('Current user ID:', state.currentUser?.id);
@@ -3065,6 +3101,7 @@ button:not(#muteBtn):active:not(:disabled) {
             console.log('SHOWING VOTER VIEW');
             readerView.style.display = 'none';
             voterView.style.display = 'block';
+            updateInstigatorBanner();
 
             const voterQuestion = document.getElementById('voterQuestionCard');
             const voterStatus = document.getElementById('voterStatus');
@@ -3261,6 +3298,7 @@ button:not(#muteBtn):active:not(:disabled) {
                 }
                 updateVotingStatus();
             } else if (!state.hasVoted) {
+                updateInstigatorBanner();
                 if (state.instigatorVoteConfirmed) {
                     document.getElementById('voterQuestionCard').textContent = state.currentQuestion;
                     document.getElementById('voterQuestionCard').classList.remove('waiting');
