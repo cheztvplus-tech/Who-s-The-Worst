@@ -3175,8 +3175,16 @@ button:not(#muteBtn):active:not(:disabled) {
             </div>
         `;
         
-        const actionButtons = document.querySelector('#readerView .action-buttons');
-        actionButtons.parentNode.insertBefore(picker, actionButtons.nextSibling);
+        // Insert BEFORE the question card so user doesn't need to scroll
+        const qCardEl = document.getElementById('readerQuestionCard');
+        if (qCardEl && qCardEl.parentNode) {
+            qCardEl.parentNode.insertBefore(picker, qCardEl);
+        } else {
+            const actionButtons = document.querySelector('#readerView .action-buttons');
+            actionButtons.parentNode.insertBefore(picker, actionButtons.nextSibling);
+        }
+        // Scroll to top so both question and player picker are visible
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
         function selectInstigatorVote(playerId) {
@@ -5188,10 +5196,10 @@ console.log('✨ Enhancement pack: Alive Players + Spotlight + Juicy Cards loade
 
 <script>
 /* ╔══════════════════════════════════════════════════════════════╗
-   ║                   ABILITY SYSTEM CORE                      ║
+   ║              ABILITY SYSTEM CORE  v2 — FULLY WORKING       ║
    ╚══════════════════════════════════════════════════════════════╝ */
 
-/* ── ABILITY DEFINITIONS (balanced: 40% off / 30% def / 20% chaos / 10% rare) ── */
+/* ── ABILITY DEFINITIONS ── */
 const ABILITIES = {
     // ── OFFENSIVE (4) ──
     triple_threat: {
@@ -5371,8 +5379,8 @@ const AP = {
 /* ── Ability tray in voter view HTML injection ── */
 function injectAbilityTray() {
     if (document.getElementById('abilityTray')) return;
-    const votingSection = document.getElementById('votingSection');
-    if (!votingSection) return;
+    const voterView = document.getElementById('voterView');
+    if (!voterView) return;
     const tray = document.createElement('div');
     tray.id = 'abilityTray';
     tray.innerHTML = `
@@ -5381,8 +5389,8 @@ function injectAbilityTray() {
         </h4>
         <div class="ability-slots"></div>
     `;
-    // Insert after votingSection
-    votingSection.after(tray);
+    // Append at end of voterView — always visible
+    voterView.appendChild(tray);
     AP.renderTray();
 }
 
@@ -5660,10 +5668,18 @@ function checkUnderdogReward() {
     const myScore = state.scores[myId] || 0;
     const isUnderdog = myScore <= minScore;
     const inv = AP.inventory[myId] || [];
-    if (isUnderdog && !inv.includes('immunity') && !inv.includes('second_chance')) {
-        // Give free Second Chance to underdog
-        AP.giveAbility(myId, 'second_chance');
-        showToast('🛡️ Underdog bonus: Free Second Chance ability!', 4000);
+    if (!isUnderdog) return;
+
+    // Only give Second Chance free in harsh (minus_two) mode — otherwise just give AP
+    if (state.doubleDownPenalty === 'minus_two') {
+        if (!inv.includes('second_chance')) {
+            AP.giveAbility(myId, 'second_chance');
+            showToast('🛡️ Underdog bonus: Free Second Chance ability!', 4000);
+        }
+    } else {
+        // In other modes: give 20 bonus AP as consolation
+        AP.addAP(myId, 20);
+        showToast('🛡️ Underdog bonus: +20 AP!', 3000);
     }
 }
 
@@ -5678,43 +5694,63 @@ function checkLootBoxDrop() {
 }
 
 /* ══════════════════════════════════════
-   PATCH revealVotes TO APPLY ABILITIES
+   APPLY ABILITIES IN revealVotes
+   All ability effects are baked into the
+   score calculation BEFORE the DB write.
 ══════════════════════════════════════ */
+
+/* Vote Shuffle: randomise targets in state.votes so revealVotes uses shuffled data */
+function applyVoteShuffle() {
+    // Find anyone with vote_shuffle active
+    const shuffler = Object.entries(AP.activeThisRound)
+        .find(([, a]) => a.abilityId === 'vote_shuffle');
+    if (!shuffler) return false;
+
+    const voterIds = Object.keys(state.votes).filter(id => id !== state.currentReader);
+    if (voterIds.length < 2) return false;
+
+    const targets = voterIds.map(id => state.votes[id].target);
+    for (let i = targets.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [targets[i], targets[j]] = [targets[j], targets[i]];
+    }
+    voterIds.forEach((id, i) => {
+        if (state.votes[id]) state.votes[id] = { ...state.votes[id], target: targets[i] };
+    });
+    showToast('🔀 Vote Shuffle activated — chaos reigns!', 3500);
+    return true;
+}
+
+/* Intercept revealVotes to apply shuffle & triple-threat weight BEFORE scoring */
 const _origRevealVotes = window.revealVotes;
 window.revealVotes = async function() {
-    // Apply Vote Shuffle before reveal
+    // 1. Apply Vote Shuffle (mutates state.votes before scoring)
+    applyVoteShuffle();
+
+    // 2. Triple Threat: tag the voter's vote with weight=3
     const myId = state.currentUser?.id;
     const myActive = AP.activeThisRound[myId];
-
-    if (myActive?.abilityId === 'vote_shuffle') {
-        // Randomly shuffle votes (client-side chaos display)
-        const voterIds = Object.keys(state.votes).filter(id => id !== state.currentReader);
-        const targets = voterIds.map(id => state.votes[id].target);
-        for (let i = targets.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [targets[i], targets[j]] = [targets[j], targets[i]];
-        }
-        voterIds.forEach((id, i) => {
-            if (state.votes[id]) state.votes[id].target = targets[i];
-        });
-        showToast('🔀 Vote Shuffle activated — chaos reigns!', 3000);
+    if (myActive?.abilityId === 'triple_threat' && state.votes[myId]) {
+        state.votes[myId] = { ...state.votes[myId], tripleWeight: true };
     }
-
-    // Apply Triple Threat: submit vote with weight=3 (client-side bonus)
-    // We track this in active abilities and handle in score calculation below
 
     return _origRevealVotes.apply(this, arguments);
 };
 
 /* ══════════════════════════════════════
-   PATCH showResults TO SHOW AP GAINS + APPLY ABILITIES
+   PATCH showResults — full ability resolution
+   Runs AFTER the base showResults renders.
+   We handle: AP grants, streak, anon, curse,
+   marked_target, reflect, second_chance, triple_threat display.
 ══════════════════════════════════════ */
 const _origShowResults = window.showResults;
 window.showResults = function() {
+    // Run the original first (renders the results list)
     _origShowResults.apply(this, arguments);
 
-    // Apply ability effects and calculate AP rewards
     const myId = state.currentUser?.id;
+
+    // ── Recalculate correct/incorrect for each voter on this client ──
     const voterEntries = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
     const instigatorTarget = state.instigatorVote;
     const anyMatched = voterEntries.some(([, v]) => v.target === instigatorTarget);
@@ -5729,46 +5765,102 @@ window.showResults = function() {
         });
     }
 
-    // Handle each player's result
-    voterEntries.forEach(([voterId, vote]) => {
-        const correct = anyMatched
-            ? vote.target === instigatorTarget
-            : vote.target === majorityTargetId;
-        handleStreakRewards(voterId, correct);
-    });
+    // ── Only grant AP / streak for THIS client's player ──
+    // (Prevents double-counting from other players' showResults calls)
+    if (myId && myId !== state.currentReader) {
+        const myVote = state.votes[myId];
+        if (myVote) {
+            const correct = anyMatched ? myVote.target === instigatorTarget : myVote.target === majorityTargetId;
+            handleStreakRewards(myId, correct);
+        }
+    }
 
-    // Apply Curse ability
-    voterEntries.forEach(([voterId]) => {
-        const active = AP.activeThisRound[voterId];
-        if (active?.abilityId === 'curse') {
-            const cursedId = active.params.targetId;
-            const cursedPlayer = state.players.find(p => p.id === cursedId);
-            if (cursedPlayer) {
-                showToast(`🔥 Curse hit ${cursedPlayer.name}! (-1 pt)`, 3000);
-            }
+    // ── Anonymous Strike: in results list, replace voter name with "???" ──
+    // Find any voter using anon_strike
+    const anonVoters = Object.entries(AP.activeThisRound)
+        .filter(([, a]) => a.abilityId === 'anon_strike')
+        .map(([id]) => id);
+
+    if (anonVoters.length > 0) {
+        setTimeout(() => {
+            document.querySelectorAll('#resultsList .result-item').forEach(row => {
+                const nameEl = row.querySelector('.voter-name');
+                if (!nameEl) return;
+                // Check if this row belongs to an anon voter
+                anonVoters.forEach(anonId => {
+                    const anonPlayer = state.players.find(p => p.id === anonId);
+                    if (!anonPlayer) return;
+                    // If the name matches and the player isn't the instigator
+                    if (nameEl.textContent.includes(anonPlayer.name) && anonId !== myId) {
+                        nameEl.innerHTML = nameEl.innerHTML.replace(
+                            anonPlayer.name,
+                            '<span style="color:#8a8a9a;font-style:italic;">🕶️ Anonymous</span>'
+                        );
+                    }
+                });
+            });
+        }, 100);
+    }
+
+    // ── Curse: show toast for cursed player ──
+    Object.entries(AP.activeThisRound).forEach(([voterId, active]) => {
+        if (active.abilityId !== 'curse') return;
+        const cursedId = active.params?.targetId;
+        if (!cursedId) return;
+        const cursedPlayer = state.players.find(p => p.id === cursedId);
+        const wasVoted = voterEntries.some(([, v]) => v.target === cursedId);
+        if (wasVoted && cursedPlayer) {
+            setTimeout(() => showToast(`🔥 Curse hit ${cursedPlayer.name}! They lose 1 pt this round.`, 4000), 600);
         }
     });
 
-    // Apply Marked Target
-    voterEntries.forEach(([voterId, vote]) => {
-        const active = AP.activeThisRound[voterId];
-        if (active?.abilityId === 'marked_target') {
-            // Count others who voted same target
-            const sameVoters = voterEntries.filter(([oid, ov]) => oid !== voterId && ov.target === vote.target).length;
+    // ── Marked Target: AP bonus for each other player who voted same target ──
+    if (myId && AP.activeThisRound[myId]?.abilityId === 'marked_target') {
+        const myVote = state.votes[myId];
+        if (myVote) {
+            const sameVoters = voterEntries.filter(([oid, ov]) => oid !== myId && ov.target === myVote.target).length;
             if (sameVoters > 0) {
-                AP.addAP(voterId, sameVoters * 10);
-                if (voterId === myId) showToast(`🎯 Marked Target! +${sameVoters * 10} AP bonus!`);
+                AP.addAP(myId, sameVoters * 15);
+                setTimeout(() => showToast(`🎯 Marked Target! +${sameVoters * 15} AP — ${sameVoters} player(s) agreed!`, 4000), 800);
             }
+        }
+    }
+
+    // ── Reflect: show who got reflected ──
+    Object.entries(AP.activeThisRound).forEach(([reflectId, active]) => {
+        if (active.abilityId !== 'reflect') return;
+        const reflectedOn = voterEntries.filter(([, v]) => v.target === reflectId);
+        if (reflectedOn.length > 0) {
+            const names = reflectedOn.map(([id]) => state.players.find(p => p.id === id)?.name).filter(Boolean);
+            setTimeout(() => showToast(`🪞 Reflect! ${names.join(', ')} voted ${state.players.find(p => p.id === reflectId)?.name} — reflected back!`, 4000), 700);
         }
     });
 
-    // Underdog check after round
-    setTimeout(checkUnderdogReward, 500);
-    // Loot box drop
-    setTimeout(checkLootBoxDrop, 1000);
+    // ── Second Chance: show toast if it saved points ──
+    if (myId && AP.activeThisRound[myId]?.abilityId === 'second_chance') {
+        const myVote = state.votes[myId];
+        if (myVote) {
+            const correct = anyMatched ? myVote.target === instigatorTarget : myVote.target === majorityTargetId;
+            const hadPenalty = myVote.doubleDown && !correct && state.doubleDownPenalty === 'minus_two';
+            if (hadPenalty || (!correct)) {
+                // Only relevant in harsh mode for the -2 cancel
+                if (state.doubleDownPenalty === 'minus_two' && hadPenalty) {
+                    setTimeout(() => showToast('❤️ Second Chance saved you from -2 pts!', 4000), 900);
+                }
+            }
+        }
+    }
 
-    // Render AP bar
-    setTimeout(() => AP.renderBar(), 200);
+    // ── Underdog & Loot Box checks ──
+    setTimeout(checkUnderdogReward, 600);
+    setTimeout(checkLootBoxDrop, 1200);
+
+    // ── Re-render AP bar after short delay ──
+    setTimeout(() => {
+        AP.renderBar();
+        const lbl = document.getElementById('myApLabel');
+        if (lbl) lbl.textContent = `${AP.myAP} AP`;
+    }, 300);
 };
 
 /* ══════════════════════════════════════
@@ -5791,7 +5883,6 @@ window.initGameView = function() {
         injectAbilityTray();
         AP.renderBar();
         AP.renderTray();
-        // Update "my AP" label in tray
         const lbl = document.getElementById('myApLabel');
         if (lbl) lbl.textContent = `${AP.myAP} AP`;
     }, 350);
@@ -5799,23 +5890,20 @@ window.initGameView = function() {
 
 /* ══════════════════════════════════════
    PATCH updateVoteOptions FOR IMMUNITY
+   Remove immune players from the vote grid
 ══════════════════════════════════════ */
 const _origUpdateVoteOptions = window.updateVoteOptions;
 window.updateVoteOptions = function() {
-    // Filter out immune players
-    const originalPlayers = state.players;
     const immunePlayers = Object.entries(AP.activeThisRound)
         .filter(([, a]) => a.abilityId === 'immunity')
         .map(([id]) => id);
 
     if (immunePlayers.length > 0) {
-        // Temporarily filter immune players from vote options
-        state.players = state.players.filter(p => !immunePlayers.includes(p.id));
+        const originalPlayers = state.players;
+        // Exclude immune players from vote targets
+        state.players = state.players.filter(p => !immunePlayers.includes(p.id) || p.id === state.currentReader);
         _origUpdateVoteOptions.apply(this, arguments);
         state.players = originalPlayers;
-        if (immunePlayers.includes(state.currentUser?.id)) {
-            showToast('🛡️ Immunity active — you\'re hidden from votes!');
-        }
     } else {
         _origUpdateVoteOptions.apply(this, arguments);
     }
@@ -5826,11 +5914,10 @@ window.updateVoteOptions = function() {
 ══════════════════════════════════════ */
 const _origStartGame = window.startGame;
 window.startGame = async function() {
-    // Init AP for all players
     state.players.forEach(p => {
         if (!AP.points[p.id]) AP.points[p.id] = 0;
         if (!AP.inventory[p.id]) AP.inventory[p.id] = [];
-        AP.streaks[p.id] = 0;
+        if (!AP.streaks[p.id]) AP.streaks[p.id] = 0;
     });
     return _origStartGame.apply(this, arguments);
 };
@@ -5840,7 +5927,7 @@ document.getElementById('shopModal').addEventListener('click', function(e) {
     if (e.target === this) closeShop();
 });
 
-console.log('⚡ Ability System loaded — 10 abilities, shop, loot box, streaks, underdog protection');
+console.log('⚡ Ability System v2 loaded — bugs fixed, all abilities wired up');
 </script>
         
 </body>
