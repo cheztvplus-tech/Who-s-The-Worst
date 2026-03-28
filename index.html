@@ -4344,6 +4344,445 @@ window.updateLobby = function() {
 console.log('🎮 Game-feel enhancements loaded');
 })();
 </script>
+
+<!-- ===== ENHANCEMENT PACK: ALIVE PLAYERS, SPOTLIGHT READER, JUICY CARDS ===== -->
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   1. PLAYER CARDS — ALIVE, NOT UI WIDGETS
+══════════════════════════════════════════════════════════════════ */
+
+/* Breathing idle state for all player cards */
+@keyframes playerIdleFloat {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-3px); }
+}
+
+/* Status pip — tiny dot above avatar */
+.player-card .status-pip {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid rgba(0,0,0,0.5);
+    z-index: 3;
+}
+.status-pip.pip-waiting {
+    background: #feca57;
+    box-shadow: 0 0 8px rgba(254,202,87,0.8);
+    animation: pipPulse 1.2s ease-in-out infinite;
+}
+.status-pip.pip-voted {
+    background: #2ecc71;
+    box-shadow: 0 0 8px rgba(46,204,113,0.8);
+}
+.status-pip.pip-instigator {
+    background: #ff6b6b;
+    box-shadow: 0 0 10px rgba(255,107,107,0.9);
+    animation: pipPulse 0.8s ease-in-out infinite;
+}
+@keyframes pipPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%       { transform: scale(1.35); opacity: 0.7; }
+}
+
+/* Status label below name — "👀 voting" / "✔ done" */
+.player-status-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border-radius: 8px;
+    padding: 2px 6px;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+}
+.player-status-label.lbl-voting {
+    color: #feca57;
+    background: rgba(254,202,87,0.12);
+    border: 1px solid rgba(254,202,87,0.25);
+}
+.player-status-label.lbl-done {
+    color: #2ecc71;
+    background: rgba(46,204,113,0.12);
+    border: 1px solid rgba(46,204,113,0.25);
+}
+.player-status-label.lbl-instigator {
+    color: #ff6b6b;
+    background: rgba(255,107,107,0.12);
+    border: 1px solid rgba(255,107,107,0.3);
+    animation: lblGlow 1.5s ease-in-out infinite;
+}
+@keyframes lblGlow {
+    0%, 100% { box-shadow: none; }
+    50%       { box-shadow: 0 0 10px rgba(255,107,107,0.4); }
+}
+
+/* Enhanced current-user outline — clear spotlight */
+.player-card.current-user {
+    outline: 3px solid rgba(254,202,87,0.7) !important;
+    outline-offset: 2px;
+    box-shadow:
+        0 0 0 4px rgba(254,202,87,0.12),
+        0 0 30px rgba(254,202,87,0.35),
+        0 0 60px rgba(254,202,87,0.1) !important;
+}
+
+/* Avatar ring that pulses with player color */
+.player-avatar.avatar-ring {
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.1), 0 4px 15px rgba(0,0,0,0.4) !important;
+    transition: box-shadow 0.4s ease !important;
+}
+
+/* Idle float on non-voted, non-current player cards */
+.player-card:not(.voted):not(.current-user) {
+    animation: playerIdleFloat 4s ease-in-out infinite;
+}
+.player-card:not(.voted):not(.current-user):nth-child(2) { animation-delay: 0.6s; }
+.player-card:not(.voted):not(.current-user):nth-child(3) { animation-delay: 1.2s; }
+.player-card:not(.voted):not(.current-user):nth-child(4) { animation-delay: 0.3s; }
+.player-card:not(.voted):not(.current-user):nth-child(5) { animation-delay: 0.9s; }
+.player-card:not(.voted):not(.current-user):nth-child(6) { animation-delay: 1.5s; }
+
+/* ══════════════════════════════════════════════════════════════════
+   2. READER / INSTIGATOR SPOTLIGHT
+══════════════════════════════════════════════════════════════════ */
+
+/* Dramatic spotlight wrapper around the instigator status bar */
+#instigatorStatusBar {
+    position: relative;
+    overflow: hidden;
+    font-size: 1rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.5px;
+    text-align: center;
+    padding: 16px 20px !important;
+    border-radius: 16px !important;
+    background: linear-gradient(135deg,
+        rgba(255,107,107,0.18) 0%,
+        rgba(107,47,160,0.12) 100%) !important;
+    border: 1px solid rgba(255,107,107,0.4) !important;
+    color: #ff8a8a !important;
+}
+
+/* Sweep-light across the status bar */
+#instigatorStatusBar::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+    animation: statusSweep 3s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes statusSweep {
+    0%   { left: -100%; }
+    60%  { left: 160%; }
+    100% { left: 160%; }
+}
+
+/* Glow pulse on the bar itself */
+@keyframes instigatorBarPulse {
+    0%, 100% {
+        box-shadow: 0 0 15px rgba(255,107,107,0.25),
+                    inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    50% {
+        box-shadow: 0 0 35px rgba(255,107,107,0.5),
+                    0 0 60px rgba(255,107,107,0.15),
+                    inset 0 1px 0 rgba(255,255,255,0.1);
+    }
+}
+#instigatorStatusBar.active {
+    animation: instigatorBarPulse 2s ease-in-out infinite !important;
+}
+
+/* Instigator banner — the voter-side "who's reading" callout */
+#instigatorBanner {
+    position: relative;
+    overflow: hidden;
+}
+#instigatorBanner::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255,255,255,0.04) 50%,
+        transparent 100%);
+    animation: bannerShimmer 4s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes bannerShimmer {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Slide-in animation each time instigator banner updates */
+@keyframes bannerFadeSlide {
+    from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+#instigatorBanner {
+    animation: bannerFadeSlide 0.45s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   3. FLIP CARDS — FULL JUICE PACKAGE
+══════════════════════════════════════════════════════════════════ */
+
+/* Base tilt angles — irregular deck feel */
+.flip-card-container:nth-child(1) { transform: rotate(-3deg) translateY(0); }
+.flip-card-container:nth-child(2) { transform: rotate(1.5deg) translateY(-4px); }
+.flip-card-container:nth-child(3) { transform: rotate(-1deg) translateY(2px); }
+
+/* Hover: full lift + straighten + glow crown */
+.flip-card-container:not(.flipped):hover {
+    transform: rotate(0deg) translateY(-16px) scale(1.08) !important;
+    z-index: 10;
+    filter: drop-shadow(0 20px 40px rgba(254,202,87,0.4));
+}
+
+/* Click snap — satisfying spring */
+@keyframes cardSnapClick {
+    0%   { transform: rotate(0deg) translateY(-16px) scale(1.08); }
+    25%  { transform: rotate(0deg) translateY(-8px) scale(1.01); }
+    55%  { transform: rotate(0deg) translateY(-20px) scale(1.12); }
+    75%  { transform: rotate(0deg) translateY(-14px) scale(1.06); }
+    100% { transform: rotate(0deg) translateY(-10px) scale(1.04); }
+}
+.flip-card-container.snap-click {
+    animation: cardSnapClick 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards !important;
+}
+
+/* Flipped card: lift and glow */
+.flip-card-container.flipped {
+    transform: rotate(0deg) translateY(-10px) scale(1.04) !important;
+    z-index: 20;
+    filter: drop-shadow(0 14px 35px rgba(254,202,87,0.5));
+}
+
+/* Front face: add a warm shimmer that sweeps on hover */
+.flip-card-front {
+    position: relative;
+}
+.flip-card-front::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -80%; width: 40%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transform: skewX(-15deg);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.flip-card-container:not(.flipped):hover .flip-card-front::after {
+    opacity: 1;
+    animation: frontShimmerHover 0.6s ease forwards;
+}
+@keyframes frontShimmerHover {
+    from { left: -80%; }
+    to   { left: 140%; }
+}
+
+/* Card counter badge — "Card 1/2/3" corner pip */
+.flip-card-front .card-num-badge {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.55rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+}
+
+/* Back face glow ring on hover */
+.flip-card-container.flipped .flip-card-back {
+    box-shadow:
+        0 0 0 2px rgba(254,202,87,0.5),
+        0 12px 40px rgba(254,202,87,0.35),
+        0 0 80px rgba(254,202,87,0.1),
+        inset 0 1px 0 rgba(255,255,255,0.15) !important;
+}
+
+/* Pick button pulse when visible */
+.flip-card-back .pick-this-btn {
+    animation: pickBtnBreath 2s ease-in-out infinite;
+}
+@keyframes pickBtnBreath {
+    0%, 100% { box-shadow: 0 4px 15px rgba(255,107,107,0.3); transform: scale(1); }
+    50%       { box-shadow: 0 6px 25px rgba(255,107,107,0.55), 0 0 30px rgba(254,202,87,0.2); transform: scale(1.04); }
+}
+
+/* Card entrance — fan out from center */
+@keyframes cardFanIn {
+    from { opacity: 0; transform: rotate(0deg) scale(0.6) translateY(30px); }
+    to   { opacity: 1; }
+}
+.flip-card-container {
+    animation: cardFanIn 0.55s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.flip-card-container:nth-child(1) { animation-delay: 0.05s; }
+.flip-card-container:nth-child(2) { animation-delay: 0.15s; }
+.flip-card-container:nth-child(3) { animation-delay: 0.25s; }
+
+/* ══════════════════════════════════════════════════════════════════
+   4. VOTER STATUS GRID — STATUS INDICATORS
+══════════════════════════════════════════════════════════════════ */
+
+/* Voted icon pop */
+@keyframes checkBounceIn {
+    0%  { transform: scale(0) rotate(-20deg); }
+    60% { transform: scale(1.4) rotate(5deg); }
+    80% { transform: scale(0.9) rotate(-2deg); }
+    100%{ transform: scale(1) rotate(0); }
+}
+#votingStatus .player-card.voted div[style*="✅"] {
+    display: inline-block;
+    animation: checkBounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+
+/* Waiting hourglass spin */
+@keyframes hourglassSpin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(180deg); }
+}
+
+</style>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   ALIVE PLAYERS — patch updateLobby & updateVotingStatus
+   to inject status pips + labels + avatar color rings
+══════════════════════════════════════════════════════════════════ */
+(function() {
+'use strict';
+
+/* ── Helper: inject pip + label into a player card ── */
+function injectPlayerStatus(cardEl, pipClass, labelClass, labelText) {
+    // Remove any existing pip/label
+    cardEl.querySelector('.status-pip')?.remove();
+    cardEl.querySelector('.player-status-label')?.remove();
+
+    // Pip
+    const pip = document.createElement('div');
+    pip.className = `status-pip ${pipClass}`;
+    cardEl.appendChild(pip);
+
+    // Label
+    if (labelText) {
+        const lbl = document.createElement('div');
+        lbl.className = `player-status-label ${labelClass}`;
+        lbl.innerHTML = labelText;
+        cardEl.appendChild(lbl);
+    }
+}
+
+/* ── Patch updateVotingStatus to add alive status ── */
+const _origVotingStatus2 = window.updateVotingStatus;
+window.updateVotingStatus = function() {
+    _origVotingStatus2.apply(this, arguments);
+    requestAnimationFrame(() => {
+        const container = document.getElementById('votingStatus');
+        if (!container) return;
+        container.querySelectorAll('.player-card').forEach(card => {
+            const hasVoted = card.classList.contains('voted');
+            if (hasVoted) {
+                injectPlayerStatus(card, 'pip-voted', 'lbl-done', '✔ done');
+            } else {
+                injectPlayerStatus(card, 'pip-waiting', 'lbl-voting', '👀 voting');
+            }
+        });
+    });
+};
+
+/* ── Patch updateLobby to add YOU highlight + idle class ── */
+const _origUpdateLobby2 = window.updateLobby;
+window.updateLobby = function() {
+    _origUpdateLobby2.apply(this, arguments);
+    requestAnimationFrame(() => {
+        document.querySelectorAll('#lobbyPlayers .player-card').forEach(card => {
+            const isMe = card.classList.contains('current-user');
+            const isHost = card.querySelector('.player-status')?.textContent?.includes('Host');
+            if (isMe) {
+                injectPlayerStatus(card, '', '', '');
+                card.querySelector('.status-pip')?.remove();
+            }
+        });
+    });
+};
+
+/* ── Patch initGameView to add instigator pip on vote-status grid ── */
+const _origInitGameView2 = window.initGameView;
+window.initGameView = function() {
+    _origInitGameView2.apply(this, arguments);
+    setTimeout(() => {
+        // Also add instigator pip to the lobby/game player grids
+        document.querySelectorAll('.players-grid .player-card').forEach(card => {
+            const name = card.querySelector('.player-name')?.textContent;
+            if (!name) return;
+            const player = state.players.find(p => p.name === name);
+            if (!player) return;
+            const isInstigator = player.id === state.currentReader;
+            if (isInstigator) {
+                card.querySelector('.status-pip')?.remove();
+                card.querySelector('.player-status-label')?.remove();
+                injectPlayerStatus(card, 'pip-instigator', 'lbl-instigator', '🎯 instigator');
+            }
+        });
+    }, 350);
+};
+
+/* ══════════════════════════════════════════════════════════════════
+   CARD SNAP CLICK — snap animation on flipAndSelectCard
+══════════════════════════════════════════════════════════════════ */
+const _origFlipCard2 = window.flipAndSelectCard;
+window.flipAndSelectCard = function(cardIndex) {
+    const container = document.getElementById(`flipcard-${cardIndex}`);
+    if (container && !container.classList.contains('flipped')) {
+        container.classList.remove('snap-click');
+        void container.offsetWidth;
+        container.classList.add('snap-click');
+        setTimeout(() => container.classList.remove('snap-click'), 500);
+    }
+    return _origFlipCard2.apply(this, arguments);
+};
+
+/* ══════════════════════════════════════════════════════════════════
+   INSTIGATOR BANNER — re-animate each time it updates
+══════════════════════════════════════════════════════════════════ */
+const _origUpdateInstigatorBanner = window.updateInstigatorBanner;
+window.updateInstigatorBanner = function() {
+    _origUpdateInstigatorBanner.apply(this, arguments);
+    const banner = document.getElementById('instigatorBanner');
+    if (!banner) return;
+    banner.style.animation = 'none';
+    void banner.offsetWidth;
+    banner.style.animation = '';
+};
+
+/* ══════════════════════════════════════════════════════════════════
+   STATUS BAR active class — keep it pulsing as instigator bar
+══════════════════════════════════════════════════════════════════ */
+const _origInitGameView3 = window.initGameView;
+window.initGameView = function() {
+    _origInitGameView3.apply(this, arguments);
+    setTimeout(() => {
+        const bar = document.getElementById('instigatorStatusBar');
+        if (bar) bar.classList.add('active');
+    }, 250);
+};
+
+console.log('✨ Enhancement pack: Alive Players + Spotlight + Juicy Cards loaded');
+})();
+</script>
         
 </body>
 </html>
