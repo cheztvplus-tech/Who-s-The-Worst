@@ -1266,6 +1266,459 @@
         #muteBtn:hover { background: rgba(255,255,255,0.18); }
     </style>
 <base target="_blank">
+
+<!-- ===== GAME-FEEL ENHANCEMENT STYLES ===== -->
+<style>
+/* ── Import a punchy display font ── */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+body { font-family: 'DM Sans', -apple-system, sans-serif; }
+h1, h2, h3 { font-family: 'Syne', sans-serif; }
+
+/* ══════════════════════════════════════
+   1. BUTTON MICRO-INTERACTIONS
+══════════════════════════════════════ */
+button:not(#muteBtn) {
+    transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1),
+                box-shadow 0.15s ease,
+                filter 0.15s ease !important;
+    will-change: transform;
+}
+button:not(#muteBtn):hover:not(:disabled) {
+    transform: translateY(-3px) scale(1.02) !important;
+}
+button:not(#muteBtn):active:not(:disabled) {
+    transform: translateY(2px) scale(0.96) !important;
+    filter: brightness(0.9);
+    transition: transform 0.06s ease, filter 0.06s ease !important;
+}
+
+/* Primary button glow pulse on hover */
+.btn-primary:hover:not(:disabled) {
+    box-shadow: 0 8px 32px rgba(255,107,107,0.6),
+                0 0 0 2px rgba(255,107,107,0.2) !important;
+}
+.btn-success:hover:not(:disabled) {
+    box-shadow: 0 8px 32px rgba(46,204,113,0.6),
+                0 0 0 2px rgba(46,204,113,0.2) !important;
+}
+
+/* ══════════════════════════════════════
+   2. VOTE OPTIONS — GAME SHOW BUZZER FEEL
+══════════════════════════════════════ */
+.vote-option {
+    transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1),
+                box-shadow 0.18s ease,
+                border-color 0.18s ease,
+                filter 0.18s ease !important;
+    cursor: pointer;
+    will-change: transform;
+}
+.vote-option:hover {
+    transform: translateY(-6px) scale(1.04) !important;
+    filter: brightness(1.2);
+    z-index: 2;
+}
+.vote-option:active {
+    transform: translateY(3px) scale(0.95) !important;
+    transition: transform 0.06s ease !important;
+}
+/* Color-coded per position for visual variety */
+.vote-option:nth-child(4n+1):hover { box-shadow: 0 12px 35px rgba(255,107,107,0.5), inset 0 1px 0 rgba(255,255,255,0.2) !important; border-color: #ff6b6b !important; }
+.vote-option:nth-child(4n+2):hover { box-shadow: 0 12px 35px rgba(254,202,87,0.5), inset 0 1px 0 rgba(255,255,255,0.2) !important; border-color: #feca57 !important; }
+.vote-option:nth-child(4n+3):hover { box-shadow: 0 12px 35px rgba(72,219,251,0.5), inset 0 1px 0 rgba(255,255,255,0.2) !important; border-color: #48dbfb !important; }
+.vote-option:nth-child(4n+4):hover { box-shadow: 0 12px 35px rgba(255,159,243,0.5), inset 0 1px 0 rgba(255,255,255,0.2) !important; border-color: #ff9ff3 !important; }
+
+/* Vote selection pop — really satisfying */
+@keyframes votePopSelect {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(0.88) translateY(4px); }
+    60%  { transform: scale(1.14) translateY(-6px); }
+    80%  { transform: scale(0.97) translateY(-2px); }
+    100% { transform: scale(1.05) translateY(-2px); }
+}
+.vote-option.vote-popping {
+    animation: votePopSelect 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+
+/* Selected state: glowing, pulsing */
+.vote-option.selected {
+    border-color: var(--green) !important;
+    box-shadow: 0 0 0 3px rgba(46,204,113,0.4),
+                0 8px 30px rgba(46,204,113,0.5),
+                inset 0 1px 0 rgba(255,255,255,0.25) !important;
+    background: linear-gradient(145deg, rgba(46,204,113,0.22), rgba(46,204,113,0.08)) !important;
+    transform: scale(1.05) translateY(-3px) !important;
+}
+/* Checkmark badge on selected */
+.vote-option.selected::after {
+    content: '✓';
+    position: absolute;
+    top: -10px; right: -10px;
+    width: 24px; height: 24px;
+    background: var(--green);
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(46,204,113,0.6);
+    animation: checkPop 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes checkPop {
+    0% { transform: scale(0) rotate(-20deg); }
+    60% { transform: scale(1.3) rotate(5deg); }
+    100% { transform: scale(1) rotate(0); }
+}
+
+/* ══════════════════════════════════════
+   3. PLAYER CARDS — ALIVE, NOT STATIC
+══════════════════════════════════════ */
+.player-card {
+    transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1),
+                box-shadow 0.25s ease,
+                border-color 0.25s ease !important;
+}
+.player-card:hover {
+    transform: translateY(-5px) scale(1.06) !important;
+    z-index: 5;
+}
+/* Voted state: bounce in */
+@keyframes votedBounceIn {
+    0%   { transform: scale(0.85); opacity: 0.5; }
+    60%  { transform: scale(1.1); }
+    80%  { transform: scale(0.97); }
+    100% { transform: scale(1); opacity: 1; }
+}
+.player-card.voted {
+    animation: votedBounceIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+/* Reader (current-user) spotlight */
+.player-card.current-user .player-avatar {
+    box-shadow: 0 0 0 3px var(--gold), 0 0 25px rgba(254,202,87,0.6) !important;
+}
+
+/* ══════════════════════════════════════
+   4. QUESTION CARD — CINEMATIC ENTRANCE
+══════════════════════════════════════ */
+@keyframes questionReveal {
+    0%  { opacity: 0; transform: translateY(20px) scale(0.94); filter: blur(4px); }
+    60% { opacity: 1; transform: translateY(-4px) scale(1.01); filter: blur(0); }
+    100%{ opacity: 1; transform: translateY(0) scale(1); }
+}
+.question-card {
+    transition: background 0.4s ease, box-shadow 0.4s ease !important;
+}
+.question-reveal {
+    animation: questionReveal 0.55s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+/* Active state glow */
+.question-card:not(.waiting) {
+    box-shadow: 0 12px 50px rgba(107,47,160,0.5),
+                0 0 0 1px rgba(255,255,255,0.1),
+                inset 0 1px 0 rgba(255,255,255,0.12) !important;
+}
+
+/* ══════════════════════════════════════
+   5. SCREEN TRANSITIONS
+══════════════════════════════════════ */
+@keyframes screenSlideUp {
+    0%  { opacity: 0; transform: translateY(30px) scale(0.96); }
+    100%{ opacity: 1; transform: translateY(0) scale(1); }
+}
+.screen.active {
+    animation: screenSlideUp 0.4s cubic-bezier(0.34,1.56,0.64,1) both !important;
+}
+
+/* ══════════════════════════════════════
+   6. INSTIGATOR STATUS — SPOTLIGHT FEEL
+══════════════════════════════════════ */
+@keyframes spotlightPulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(255,107,107,0.3), inset 0 1px 0 rgba(255,255,255,0.1); }
+    50%       { box-shadow: 0 0 40px rgba(255,107,107,0.6), 0 0 80px rgba(255,107,107,0.15), inset 0 1px 0 rgba(255,255,255,0.15); }
+}
+.status-bar.active {
+    animation: spotlightPulse 2.5s ease-in-out infinite !important;
+    background: linear-gradient(135deg, rgba(255,107,107,0.12), rgba(107,47,160,0.08)) !important;
+    border: 1px solid rgba(255,107,107,0.35) !important;
+}
+
+/* ══════════════════════════════════════
+   7. RESULTS — STAGGERED SLIDE-IN
+══════════════════════════════════════ */
+@keyframes resultSlideIn {
+    0%  { opacity: 0; transform: translateX(-24px) scale(0.96); }
+    60% { opacity: 1; transform: translateX(4px); }
+    100%{ opacity: 1; transform: translateX(0) scale(1); }
+}
+.result-item {
+    animation: resultSlideIn 0.45s cubic-bezier(0.34,1.56,0.64,1) both !important;
+}
+
+/* ══════════════════════════════════════
+   8. FLIP CARDS — TACTILE HOVER
+══════════════════════════════════════ */
+.flip-card-container {
+    transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1) !important;
+}
+.flip-card-container:not(.flipped):hover {
+    transform: translateY(-12px) rotate(0deg) scale(1.06) !important;
+}
+.flip-card-container:not(.flipped):hover .flip-card-front {
+    box-shadow: 0 20px 50px rgba(254,202,87,0.45),
+                0 0 0 2px rgba(254,202,87,0.4),
+                inset 0 1px 0 rgba(255,255,255,0.2) !important;
+    border-color: var(--gold) !important;
+}
+/* Flip into back: satisfying snap */
+.flip-card-container.flipped {
+    transform: translateY(-8px) scale(1.03) !important;
+}
+
+/* ══════════════════════════════════════
+   9. SCOREBOARD — SCORE LEADER PULSE
+══════════════════════════════════════ */
+.score-item {
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1),
+                box-shadow 0.3s ease !important;
+}
+@keyframes leaderGlow {
+    0%, 100% { box-shadow: 0 0 20px rgba(254,202,87,0.3); transform: scale(1.05); }
+    50%       { box-shadow: 0 0 35px rgba(254,202,87,0.55); transform: scale(1.08); }
+}
+.score-item.leading {
+    animation: leaderGlow 2s ease-in-out infinite !important;
+}
+/* Score bump on point gain */
+@keyframes scoreBump {
+    0%  { transform: scale(1); }
+    40% { transform: scale(1.35); color: var(--green); }
+    70% { transform: scale(0.95); }
+    100%{ transform: scale(1); }
+}
+.score-value.bumping {
+    animation: scoreBump 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* ══════════════════════════════════════
+   10. POKER / DOUBLE-DOWN CARD
+══════════════════════════════════════ */
+.poker-card-wrap {
+    transition: transform 0.2s ease !important;
+}
+.poker-card-wrap:hover .poker-card:not(.used-card):not(.active-card) {
+    transform: translateY(-14px) rotate(-8deg) scale(1.1) !important;
+    box-shadow: 0 20px 40px rgba(245,87,108,0.5) !important;
+}
+@keyframes doubleDownActivate {
+    0%  { transform: rotate(-6deg) scale(1); }
+    30% { transform: rotate(8deg) scale(1.25); }
+    60% { transform: rotate(-4deg) scale(1.15); }
+    80% { transform: rotate(3deg) scale(1.2); }
+    100%{ transform: rotate(-6deg) scale(1.15); }
+}
+.poker-card.active-card {
+    animation: doubleDownActivate 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards !important;
+}
+
+/* ══════════════════════════════════════
+   11. ROUND INDICATOR — CHARGED FEEL
+══════════════════════════════════════ */
+.round-indicator {
+    position: relative;
+    overflow: hidden;
+}
+.round-indicator::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255,255,255,0.04) 50%,
+        transparent 100%);
+    animation: roundShimmer 3s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes roundShimmer {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* ══════════════════════════════════════
+   12. TOAST — MORE PUNCHY
+══════════════════════════════════════ */
+.toast {
+    font-family: 'Syne', sans-serif !important;
+    letter-spacing: 0.3px;
+}
+@keyframes toastBounceIn {
+    0%  { transform: translateX(-50%) translateY(120px) scale(0.8); }
+    60% { transform: translateX(-50%) translateY(-8px) scale(1.04); }
+    80% { transform: translateX(-50%) translateY(4px) scale(0.98); }
+    100%{ transform: translateX(-50%) translateY(0) scale(1); }
+}
+.toast.show {
+    animation: toastBounceIn 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards !important;
+}
+
+/* ══════════════════════════════════════
+   13. VOTE GRID — MAKE IT THE STAR
+══════════════════════════════════════ */
+.vote-grid {
+    gap: 14px !important;
+}
+.vote-option {
+    min-height: 120px !important;
+    padding: 24px 14px !important;
+    border-radius: 22px !important;
+}
+/* Ambient glow beneath vote grid when visible */
+#votingSection {
+    position: relative;
+}
+#votingSection::before {
+    content: '';
+    position: absolute;
+    top: 30%; left: 10%; right: 10%;
+    height: 60%;
+    background: radial-gradient(ellipse at center,
+        rgba(107,47,160,0.25) 0%,
+        transparent 70%);
+    filter: blur(20px);
+    pointer-events: none;
+    z-index: 0;
+}
+.vote-grid { position: relative; z-index: 1; }
+
+/* ══════════════════════════════════════
+   14. VOTING SECTION TITLE — ENERGIZED
+══════════════════════════════════════ */
+#votingSection h4 {
+    font-family: 'Syne', sans-serif !important;
+    font-size: 1.2rem !important;
+    background: linear-gradient(90deg, var(--fire), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: titlePulse 2s ease-in-out infinite alternate;
+}
+@keyframes titlePulse {
+    from { opacity: 0.85; }
+    to   { opacity: 1; }
+}
+
+/* ══════════════════════════════════════
+   15. INSTIGATOR PICKER — GAME SHOW VIBE
+══════════════════════════════════════ */
+#instigatorPicker [id^="instigator-vote-"] {
+    transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1),
+                border-color 0.2s ease,
+                background 0.2s ease !important;
+}
+#instigatorPicker [id^="instigator-vote-"]:hover {
+    transform: translateY(-4px) scale(1.04) !important;
+    border-color: rgba(255,255,255,0.35) !important;
+    background: rgba(255,255,255,0.1) !important;
+}
+#instigatorPicker [id^="instigator-vote-"]:active {
+    transform: scale(0.95) !important;
+    transition: transform 0.06s ease !important;
+}
+
+/* ══════════════════════════════════════
+   16. WINNER SCREEN — EPIC
+══════════════════════════════════════ */
+@keyframes crownBounce {
+    0%, 100% { transform: translateY(0) rotate(-5deg) scale(1); }
+    25%       { transform: translateY(-20px) rotate(5deg) scale(1.1); }
+    75%       { transform: translateY(-10px) rotate(-3deg) scale(1.05); }
+}
+.winner-crown {
+    animation: crownBounce 1.8s ease-in-out infinite !important;
+    display: block;
+    filter: drop-shadow(0 0 20px rgba(254,202,87,0.8));
+}
+@keyframes winnerNameIn {
+    0%  { opacity: 0; transform: scale(0.5) translateY(20px); filter: blur(8px); }
+    60% { opacity: 1; transform: scale(1.1) translateY(-5px); filter: blur(0); }
+    100%{ opacity: 1; transform: scale(1) translateY(0); }
+}
+.winner-name {
+    animation: winnerNameIn 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.2s both !important;
+}
+
+/* ══════════════════════════════════════
+   17. CARD ENTRANCE FOR GAME SCREEN
+══════════════════════════════════════ */
+@keyframes cardFadeSlide {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+#gameScreen .card {
+    animation: cardFadeSlide 0.4s ease both;
+}
+#gameScreen .card:nth-child(1) { animation-delay: 0.05s; }
+#gameScreen .card:nth-child(2) { animation-delay: 0.1s; }
+#gameScreen .card:nth-child(3) { animation-delay: 0.15s; }
+
+/* ══════════════════════════════════════
+   18. "PICK THIS CARD" BTN — IRRESISTIBLE
+══════════════════════════════════════ */
+.pick-this-btn {
+    position: relative;
+    overflow: hidden;
+}
+.pick-this-btn::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -60%;
+    width: 40%; height: 200%;
+    background: rgba(255,255,255,0.3);
+    transform: skewX(-20deg);
+    animation: btnShine 2.5s ease-in-out infinite;
+}
+@keyframes btnShine {
+    0%, 70%, 100% { left: -60%; opacity: 0; }
+    40%           { left: 130%; opacity: 1; }
+}
+
+/* ══════════════════════════════════════
+   19. RIPPLE EFFECT FOR VOTE BUTTONS
+══════════════════════════════════════ */
+.vote-option { overflow: hidden; }
+.ripple {
+    position: absolute;
+    border-radius: 50%;
+    transform: scale(0);
+    background: rgba(255,255,255,0.25);
+    animation: rippleOut 0.6s linear;
+    pointer-events: none;
+}
+@keyframes rippleOut {
+    to { transform: scale(4); opacity: 0; }
+}
+
+/* ══════════════════════════════════════
+   20. PHASE BANNERS — BOLD ENTRANCE
+══════════════════════════════════════ */
+@keyframes bannerSlideDown {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.phase-banner {
+    animation: bannerSlideDown 0.35s ease both !important;
+}
+
+/* ══════════════════════════════════════
+   ACCESSIBILITY: Reduce motion
+══════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+</style>
 </head>
 <body>
     <canvas id="confettiCanvas"></canvas>
@@ -3525,6 +3978,284 @@
         }
         lastTouchEnd = now;
     }, false);
+</script>
+
+<!-- ===== GAME-FEEL ENHANCEMENT LAYER ===== -->
+<script>
+(function() {
+'use strict';
+
+/* ─────────────────────────────────────────
+   RIPPLE EFFECT ON VOTE OPTIONS
+───────────────────────────────────────── */
+function addRipple(e, el) {
+    const rect = el.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    const size = Math.max(rect.width, rect.height) * 1.5;
+    const ripple = document.createElement('span');
+    ripple.className = 'ripple';
+    ripple.style.cssText = `
+        width: ${size}px; height: ${size}px;
+        left: ${x - size/2}px; top: ${y - size/2}px;
+    `;
+    el.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 650);
+}
+
+/* Attach ripple to vote options (delegated, works after DOM updates) */
+document.addEventListener('pointerdown', (e) => {
+    const vo = e.target.closest('.vote-option');
+    if (vo) addRipple(e, vo);
+}, { passive: true });
+
+/* ─────────────────────────────────────────
+   POP ANIMATION ON VOTE SELECTION
+───────────────────────────────────────── */
+const _origSubmitVote = window.submitVote;
+window.submitVote = function(targetId) {
+    // Pop animation on the clicked option
+    const el = document.getElementById(`vote-${targetId}`);
+    if (el) {
+        el.classList.remove('vote-popping');
+        void el.offsetWidth;
+        el.classList.add('vote-popping');
+        // Remove after animation finishes so .selected takes over
+        setTimeout(() => el.classList.remove('vote-popping'), 450);
+    }
+    haptic([15, 20]);
+    return _origSubmitVote.apply(this, arguments);
+};
+
+/* ─────────────────────────────────────────
+   QUESTION CARD REVEAL ANIMATION
+───────────────────────────────────────── */
+function animateQuestionCard(cardEl) {
+    if (!cardEl) return;
+    cardEl.classList.remove('question-reveal');
+    void cardEl.offsetWidth;
+    cardEl.classList.add('question-reveal');
+}
+
+/* Patch actuallySelectCard to animate the question card */
+const _origActuallySelectCard = window.actuallySelectCard;
+window.actuallySelectCard = async function(cardIndex) {
+    await _origActuallySelectCard.apply(this, arguments);
+    setTimeout(() => animateQuestionCard(document.getElementById('readerQuestionCard')), 80);
+};
+
+/* ─────────────────────────────────────────
+   SCORE BUMP ANIMATION ON CHANGE
+───────────────────────────────────────── */
+let _scoreBumpTimeout = null;
+const _origUpdateScoreboardGF = window.updateScoreboard;
+window.updateScoreboard = function() {
+    const before = {};
+    document.querySelectorAll('.score-item').forEach(el => {
+        const id = el.id?.replace('score-', '');
+        if (id) before[id] = parseInt(el.querySelector('.score-value')?.textContent) || 0;
+    });
+
+    _origUpdateScoreboardGF.apply(this, arguments);
+
+    // After DOM update, bump changed values
+    requestAnimationFrame(() => {
+        document.querySelectorAll('.score-item').forEach(el => {
+            const id = el.id?.replace('score-', '');
+            if (!id) return;
+            const valEl = el.querySelector('.score-value');
+            if (!valEl) return;
+            const newVal = parseInt(valEl.textContent) || 0;
+            if (before[id] !== undefined && newVal > before[id]) {
+                valEl.classList.remove('bumping');
+                void valEl.offsetWidth;
+                valEl.classList.add('bumping');
+                setTimeout(() => valEl.classList.remove('bumping'), 550);
+            }
+        });
+    });
+};
+
+/* ─────────────────────────────────────────
+   VOTED STATUS PULSE — when player card flips to voted
+───────────────────────────────────────── */
+let _prevVotedPlayers = new Set();
+const _origUpdateVotingStatus = window.updateVotingStatus;
+window.updateVotingStatus = function() {
+    _origUpdateVotingStatus.apply(this, arguments);
+    // After update, check for newly voted players
+    requestAnimationFrame(() => {
+        document.querySelectorAll('#votingStatus .player-card.voted').forEach(el => {
+            const name = el.querySelector('.player-name')?.textContent;
+            if (name && !_prevVotedPlayers.has(name)) {
+                _prevVotedPlayers.add(name);
+                haptic([10]);
+                // Trigger the bounce-in animation
+                el.style.animation = 'none';
+                void el.offsetWidth;
+                el.style.animation = '';
+            }
+        });
+    });
+};
+
+/* ─────────────────────────────────────────
+   SCREEN TRANSITIONS — CLEAR STALE ANIM
+───────────────────────────────────────── */
+const _origShowScreen = window.showScreen;
+window.showScreen = function(screenId) {
+    _origShowScreen.apply(this, arguments);
+    // Reset voted player tracking on new screen
+    if (screenId === 'gameScreen') {
+        _prevVotedPlayers = new Set();
+    }
+};
+
+/* ─────────────────────────────────────────
+   INSTIGATOR VOTER PICKER — RIPPLE
+───────────────────────────────────────── */
+document.addEventListener('pointerdown', (e) => {
+    const iv = e.target.closest('[id^="instigator-vote-"]');
+    if (iv) addRipple(e, iv);
+}, { passive: true });
+
+/* ─────────────────────────────────────────
+   FLIP CARD SOUND ALREADY EXISTS — but
+   also add a slight haptic on card flip
+───────────────────────────────────────── */
+const _origFlipCard = window.flipAndSelectCard;
+window.flipAndSelectCard = function(cardIndex) {
+    haptic([12, 8]);
+    return _origFlipCard.apply(this, arguments);
+};
+
+/* ─────────────────────────────────────────
+   RESULTS: Re-run stagger with longer delays
+   and animate question card reveal
+───────────────────────────────────────── */
+const _origShowResults = window.showResults;
+window.showResults = function() {
+    _origShowResults.apply(this, arguments);
+    // Animate the result question card
+    setTimeout(() => {
+        animateQuestionCard(document.getElementById('resultQuestion'));
+    }, 50);
+    // Re-stagger results
+    setTimeout(() => {
+        document.querySelectorAll('.result-item').forEach((el, i) => {
+            el.style.animationDelay = (i * 0.11 + 0.05) + 's';
+        });
+    }, 60);
+};
+
+/* ─────────────────────────────────────────
+   VOTER QUESTION CARD: animate when question arrives
+───────────────────────────────────────── */
+const _origUpdateGameView = window.updateGameView;
+window.updateGameView = function() {
+    const wasBefore = document.getElementById('voterQuestionCard')?.textContent;
+    _origUpdateGameView.apply(this, arguments);
+    requestAnimationFrame(() => {
+        const card = document.getElementById('voterQuestionCard');
+        if (card && card.textContent !== wasBefore && !card.classList.contains('waiting')) {
+            animateQuestionCard(card);
+        }
+    });
+};
+
+/* ─────────────────────────────────────────
+   ADD VOTE GRID ENTRANCE ANIMATION
+───────────────────────────────────────── */
+const _origUpdateVoteOptions = window.updateVoteOptions;
+window.updateVoteOptions = function() {
+    _origUpdateVoteOptions.apply(this, arguments);
+    requestAnimationFrame(() => {
+        document.querySelectorAll('.vote-option').forEach((el, i) => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(20px) scale(0.92)';
+            el.style.transition = 'none';
+            setTimeout(() => {
+                el.style.transition = 'opacity 0.35s ease, transform 0.4s cubic-bezier(0.34,1.56,0.64,1)';
+                el.style.opacity = '1';
+                el.style.transform = 'translateY(0) scale(1)';
+            }, i * 80 + 40);
+        });
+    });
+};
+
+/* ─────────────────────────────────────────
+   BUTTON RIPPLE (primary/secondary buttons)
+───────────────────────────────────────── */
+document.addEventListener('pointerdown', (e) => {
+    const btn = e.target.closest('button:not(#muteBtn)');
+    if (!btn || btn.disabled) return;
+    addRipple(e, btn);
+}, { passive: true });
+
+/* ─────────────────────────────────────────
+   ENHANCE INSTIGATOR PICKER ENTRANCE
+───────────────────────────────────────── */
+const _origShowInstigatorVoteOptions = window.showInstigatorVoteOptions;
+window.showInstigatorVoteOptions = function() {
+    _origShowInstigatorVoteOptions.apply(this, arguments);
+    requestAnimationFrame(() => {
+        const picker = document.getElementById('instigatorPicker');
+        if (!picker) return;
+        picker.style.opacity = '0';
+        picker.style.transform = 'translateY(18px)';
+        picker.style.transition = 'opacity 0.4s ease, transform 0.45s cubic-bezier(0.34,1.56,0.64,1)';
+        setTimeout(() => {
+            picker.style.opacity = '1';
+            picker.style.transform = 'translateY(0)';
+        }, 30);
+        // Stagger individual cards
+        picker.querySelectorAll('[id^="instigator-vote-"]').forEach((el, i) => {
+            el.style.opacity = '0';
+            el.style.transform = 'scale(0.88) translateY(12px)';
+            el.style.transition = 'none';
+            setTimeout(() => {
+                el.style.transition = 'opacity 0.3s ease, transform 0.35s cubic-bezier(0.34,1.56,0.64,1), border-color 0.2s, background 0.2s';
+                el.style.opacity = '1';
+                el.style.transform = 'scale(1) translateY(0)';
+            }, i * 70 + 80);
+        });
+    });
+};
+
+/* ─────────────────────────────────────────
+   WINNER SCREEN — HAPTIC + CONFETTI
+   (already has these, just enhance timing)
+───────────────────────────────────────── */
+const _origShowWinner = window.showWinner;
+window.showWinner = function(winnerId) {
+    _origShowWinner.apply(this, arguments);
+    // Extra confetti wave
+    setTimeout(launchConfetti, 1200);
+    setTimeout(launchConfetti, 2400);
+};
+
+/* ─────────────────────────────────────────
+   LOBBY PLAYER CARDS STAGGER IN
+───────────────────────────────────────── */
+const _origUpdateLobby = window.updateLobby;
+window.updateLobby = function() {
+    _origUpdateLobby.apply(this, arguments);
+    requestAnimationFrame(() => {
+        document.querySelectorAll('#lobbyPlayers .player-card').forEach((el, i) => {
+            el.style.animation = 'none';
+            el.style.opacity = '0';
+            el.style.transform = 'scale(0.85) translateY(10px)';
+            setTimeout(() => {
+                el.style.transition = 'opacity 0.3s ease, transform 0.35s cubic-bezier(0.34,1.56,0.64,1)';
+                el.style.opacity = '1';
+                el.style.transform = 'scale(1) translateY(0)';
+            }, i * 60 + 20);
+        });
+    });
+};
+
+console.log('🎮 Game-feel enhancements loaded');
+})();
 </script>
         
 </body>
