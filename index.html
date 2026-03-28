@@ -1049,7 +1049,7 @@
 
         .flip-card-container { 
             width:150px; height:200px; perspective:1000px; cursor:pointer; flex-shrink:0;
-            transition: transform 0.3s ease, height 0.4s cubic-bezier(0.34,1.56,0.64,1);
+            transition: transform 0.3s ease;
         }
 
         /* Random rotation for "real card" feel */
@@ -1060,7 +1060,7 @@
 
         .flip-card-inner { position:relative; width:100%; height:100%; transform-style:preserve-3d; transition:transform 0.6s cubic-bezier(0.4,0.2,0.2,1); border-radius:16px; }
         .flip-card-container.flipped .flip-card-inner { transform:rotateY(180deg); }
-        .flip-card-container.flipped { height: 280px; }
+        /* height stays fixed — question revealed in bottom sheet instead */
 
         /* Selected card state */
         .flip-card-container.selected .flip-card-inner {
@@ -1151,8 +1151,9 @@
         .flip-card-front .card-category { color:var(--gold); font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; text-align:center; font-weight: 700; }
         .flip-card-front .card-label    { color:#fff; font-size:0.85rem; font-weight:bold; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
 
-        .flip-card-back .card-question-text  { color:#fff; font-size:0.76rem; font-weight:600; line-height:1.35; text-align:center; flex:1; display:flex; align-items:center; justify-content:center; }
-        .flip-card-back .card-category-back  { color:var(--gold); font-size:0.7rem; text-transform:uppercase; letter-spacing: 1px; font-weight: 700; }
+        .flip-card-back .card-question-text  { display: none; /* text shown in bottom sheet */ }
+        .flip-card-back .card-category-back  { color:var(--gold); font-size:0.85rem; text-transform:uppercase; letter-spacing: 1px; font-weight: 800; text-align:center; }
+        /* pick-this-btn lives in the card-peek-sheet, not the card back */
 
         .flip-card-back .pick-this-btn {
             margin-top:6px; padding:9px 16px;
@@ -1172,6 +1173,97 @@
         .flip-card-back .pick-this-btn:active { transform:scale(0.95) translateY(0); }
 
         .card-picker-hint { color:var(--muted); font-size:0.85rem; margin-top:8px; font-style: italic; }
+
+        /* ===== CARD PEEK BOTTOM SHEET ===== */
+        /* Slides up from bottom — layout never shifts */
+        #cardPeekSheet {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            z-index: 4500;
+            background: linear-gradient(160deg, #1a0a30 0%, #0f0f1a 100%);
+            border-radius: 24px 24px 0 0;
+            border-top: 2px solid rgba(254,202,87,0.4);
+            box-shadow: 0 -8px 40px rgba(0,0,0,0.7), 0 0 60px rgba(107,47,160,0.3);
+            padding: 20px 20px 36px;
+            transform: translateY(110%);
+            transition: transform 0.38s cubic-bezier(0.34,1.56,0.64,1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        #cardPeekSheet.open {
+            transform: translateY(0);
+        }
+        #cardPeekSheet .sheet-handle {
+            width: 40px; height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            margin: 0 auto 16px;
+        }
+        #cardPeekSheet .sheet-category {
+            color: var(--gold);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        #cardPeekSheet .sheet-question {
+            color: #fff;
+            font-size: 1.15rem;
+            font-weight: 700;
+            line-height: 1.5;
+            text-align: center;
+            margin-bottom: 20px;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #cardPeekSheet .sheet-pick-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(45deg, var(--fire), var(--gold));
+            color: var(--dark3);
+            border: none;
+            border-radius: 14px;
+            font-size: 1rem;
+            font-weight: 800;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            box-shadow: 0 4px 20px rgba(255,107,107,0.4);
+            transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
+            margin-bottom: 10px;
+        }
+        #cardPeekSheet .sheet-pick-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(255,107,107,0.6);
+        }
+        #cardPeekSheet .sheet-pick-btn:active {
+            transform: scale(0.96);
+        }
+        #cardPeekSheet .sheet-close-btn {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 12px;
+            color: var(--muted);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        #cardPeekOverlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 4400;
+            display: none;
+            backdrop-filter: blur(2px);
+        }
+        #cardPeekOverlay.open { display: block; }
 
         /* ===== ROUND INDICATOR ===== */
         .round-indicator {
@@ -1244,9 +1336,7 @@
         @media (max-width:400px) {
             .players-grid { grid-template-columns:repeat(2,1fr); }
             .flip-card-container { width:115px; height:160px; }
-            .flip-card-container.flipped { height: 250px; }
             h1 { font-size:1.75rem; }
-            .flip-card-container { width:115px; height:160px; }
         }
 
         /* ===== MUTE BUTTON ===== */
@@ -3510,12 +3600,61 @@ button:not(#muteBtn):active:not(:disabled) {
         btn.classList.add('hidden');
     }
 
-    // Flip card on click (peek) — toggles flip
+    // Track which card index is currently peeked
+    let _peekingCardIndex = null;
+
+    // Flip card on click — spins card in place, opens bottom sheet with question
     function flipAndSelectCard(cardIndex) {
         const container = document.getElementById(`flipcard-${cardIndex}`);
         if (!container) return;
         playSound('cardFlip');
-        container.classList.toggle('flipped');
+        haptic([12, 8]);
+
+        // If this card is already flipped, close the sheet and unflip
+        if (container.classList.contains('flipped') && _peekingCardIndex === cardIndex) {
+            closeCardPeekSheet();
+            return;
+        }
+
+        // Unflip any previously flipped card
+        if (_peekingCardIndex !== null && _peekingCardIndex !== cardIndex) {
+            const prev = document.getElementById(`flipcard-${_peekingCardIndex}`);
+            if (prev) prev.classList.remove('flipped');
+        }
+
+        // Flip this card
+        container.classList.add('flipped');
+        _peekingCardIndex = cardIndex;
+
+        // Populate and open the bottom sheet
+        const data = _cardPickerData[cardIndex];
+        if (!data) return;
+        document.getElementById('sheetCategory').textContent = data.category || 'Question';
+        document.getElementById('sheetQuestion').textContent = data.text;
+        document.getElementById('sheetPickBtn').dataset.idx = cardIndex;
+
+        document.getElementById('cardPeekOverlay').classList.add('open');
+        document.getElementById('cardPeekSheet').classList.add('open');
+    }
+
+    function closeCardPeekSheet() {
+        document.getElementById('cardPeekSheet').classList.remove('open');
+        document.getElementById('cardPeekOverlay').classList.remove('open');
+        // Unflip the card
+        if (_peekingCardIndex !== null) {
+            const c = document.getElementById(`flipcard-${_peekingCardIndex}`);
+            if (c) c.classList.remove('flipped');
+            _peekingCardIndex = null;
+        }
+    }
+
+    function pickSheetCard() {
+        const idx = parseInt(document.getElementById('sheetPickBtn').dataset.idx);
+        // Close sheet first (no unflip — card stays flipped as "selected")
+        document.getElementById('cardPeekSheet').classList.remove('open');
+        document.getElementById('cardPeekOverlay').classList.remove('open');
+        _peekingCardIndex = null;
+        actuallySelectCard(idx);
     }
 
     async function actuallySelectCard(cardIndex) {
@@ -4218,11 +4357,7 @@ document.addEventListener('pointerdown', (e) => {
    FLIP CARD SOUND ALREADY EXISTS — but
    also add a slight haptic on card flip
 ───────────────────────────────────────── */
-const _origFlipCard = window.flipAndSelectCard;
-window.flipAndSelectCard = function(cardIndex) {
-    haptic([12, 8]);
-    return _origFlipCard.apply(this, arguments);
-};
+/* flip card haptic is now built into flipAndSelectCard directly */
 
 /* ─────────────────────────────────────────
    RESULTS: Re-run stagger with longer delays
@@ -4748,20 +4883,7 @@ window.initGameView = function() {
     }, 350);
 };
 
-/* ══════════════════════════════════════════════════════════════════
-   CARD SNAP CLICK — snap animation on flipAndSelectCard
-══════════════════════════════════════════════════════════════════ */
-const _origFlipCard2 = window.flipAndSelectCard;
-window.flipAndSelectCard = function(cardIndex) {
-    const container = document.getElementById(`flipcard-${cardIndex}`);
-    if (container && !container.classList.contains('flipped')) {
-        container.classList.remove('snap-click');
-        void container.offsetWidth;
-        container.classList.add('snap-click');
-        setTimeout(() => container.classList.remove('snap-click'), 500);
-    }
-    return _origFlipCard2.apply(this, arguments);
-};
+/* snap-click animation is now built into flipAndSelectCard directly */
 
 /* ══════════════════════════════════════════════════════════════════
    INSTIGATOR BANNER — re-animate each time it updates
@@ -5930,5 +6052,15 @@ document.getElementById('shopModal').addEventListener('click', function(e) {
 console.log('⚡ Ability System v2 loaded — bugs fixed, all abilities wired up');
 </script>
         
+<!-- ===== CARD PEEK BOTTOM SHEET ===== -->
+<div id="cardPeekOverlay" onclick="closeCardPeekSheet()"></div>
+<div id="cardPeekSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-category" id="sheetCategory"></div>
+    <div class="sheet-question" id="sheetQuestion"></div>
+    <button class="sheet-pick-btn" id="sheetPickBtn" onclick="pickSheetCard()">✓ Pick This Card</button>
+    <button class="sheet-close-btn" onclick="closeCardPeekSheet()">← Back to cards</button>
+</div>
+
 </body>
 </html>
