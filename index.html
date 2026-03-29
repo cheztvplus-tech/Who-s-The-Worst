@@ -2932,6 +2932,22 @@ button:not(#muteBtn):active:not(:disabled) {
         return;
     }
     
+    // Host reset the game — all clients return to lobby with clean state
+    if (room.game_state === 'waiting') {
+        state.gameState               = 'waiting';
+        state.currentQuestion         = null;
+        state.currentReader           = null;
+        state.instigatorVote          = null;
+        state.instigatorVoteConfirmed = false;
+        state.hasVoted                = false;
+        state.votes                   = {};
+        state.scores                  = room.scores || {};
+        state.round                   = 1;
+        state.abilityActions          = {};
+        showScreen('lobbyScreen');
+        return;
+    }
+
     // Check if we're transitioning to a new round before updating state
     const isNewRound = room.game_state === 'playing' && !room.current_question && state.currentQuestion;
     const wasResults = state.gameState === 'results';
@@ -2949,10 +2965,10 @@ button:not(#muteBtn):active:not(:disabled) {
     // Sync ability_actions so showResults can read them on all clients
     if (room.ability_actions !== undefined) state.abilityActions = room.ability_actions || {};
     
-    // If winner screen is already showing, don't let any room update pull us away from it
-    if (document.getElementById('winnerScreen').classList.contains('active')) return;
-    // Also guard by local state flag
-    if (state.gameState === 'winner') return;
+    // If winner screen is showing, only allow the host's "waiting" reset to pull us away
+    if (document.getElementById('winnerScreen').classList.contains('active') && room.game_state !== 'waiting') return;
+    // Also guard by local state flag (but not if host is resetting)
+    if (state.gameState === 'winner' && room.game_state !== 'waiting') return;
 
     // If game is playing or results, switch to game screen
     if (state.gameState === 'playing' || state.gameState === 'results') {
@@ -3082,20 +3098,41 @@ button:not(#muteBtn):active:not(:disabled) {
                     scores: scores,
                     double_down_penalty: state.doubleDownPenalty,
                     points_to_win: state.pointsToWin || 7,
-                    started_at: new Date().toISOString() 
+                    started_at: new Date().toISOString(),
+                    // ── Reset all stale state from previous game ──
+                    current_question:  null,
+                    instigator_vote:   null,
+                    current_round:     1,
+                    last_majority:     null,
+                    majority_fallback: false,
+                    ability_actions:   {},
                 })
                 .eq('id', roomId);
+
+            // Also reset double_down_used on every player so they get their card back
+            await supabaseClient
+                .from('players')
+                .update({ double_down_used: false })
+                .eq('room_id', roomId);
             
             if (error) throw error;
             
             console.log('Room updated successfully');
             
             // Set local state BEFORE calling initGameView so isInstigator works correctly
-            state.currentReader = startingReader;
-            state.gameState = 'playing';
-            state.scores = scores;
-            state.doubleDownPenalty = state.doubleDownPenalty || 'lose_card';
-            CONFIG.POINTS_TO_WIN = state.pointsToWin || 7;
+            state.currentReader           = startingReader;
+            state.gameState               = 'playing';
+            state.scores                  = scores;
+            state.doubleDownPenalty       = state.doubleDownPenalty || 'lose_card';
+            CONFIG.POINTS_TO_WIN          = state.pointsToWin || 7;
+            // ── Clear ALL stale state from previous game ──
+            state.currentQuestion         = null;
+            state.instigatorVote          = null;
+            state.instigatorVoteConfirmed = false;
+            state.hasVoted                = false;
+            state.votes                   = {};
+            state.round                   = 1;
+            state.abilityActions          = {};
 
             showScreen('gameScreen');
             initGameView();
@@ -4348,20 +4385,53 @@ button:not(#muteBtn):active:not(:disabled) {
         }
     }
 
-    function playAgain() {
-        showScreen('lobbyScreen');
-        state.gameState = 'waiting';
-        state.doubleDownUsed = false;
-        state.scores = {};
-        state.round = 1;
-        state.currentQuestion = null;
-        state.instigatorVote = null;
-        state.instigatorVoteConfirmed = false;
-        state.hasVoted = false;
-        state.votes = {};
-        if (state.currentUser?.room_id) {
-            loadPlayers(state.currentUser.room_id);
+    async function playAgain() {
+        const roomId = state.currentUser?.room_id;
+
+        // ── Reset the room in the DB so all clients return to a clean lobby ──
+        if (roomId) {
+            try {
+                await supabaseClient.from('rooms').update({
+                    game_state:        'waiting',
+                    current_question:  null,
+                    current_reader:    null,
+                    instigator_vote:   null,
+                    current_round:     1,
+                    last_majority:     null,
+                    majority_fallback: false,
+                    ability_actions:   {},
+                    scores:            {},
+                }).eq('id', roomId);
+
+                // Reset double_down_used for all players
+                await supabaseClient.from('players')
+                    .update({ double_down_used: false })
+                    .eq('room_id', roomId);
+
+                // Clear all votes from this room
+                await supabaseClient.from('votes').delete().eq('room_id', roomId);
+                // Clear used questions so deck is fresh
+                await supabaseClient.from('used_questions').delete().eq('room_id', roomId);
+            } catch(e) {
+                console.error('playAgain reset error:', e);
+            }
         }
+
+        // ── Reset all local state ──
+        state.gameState               = 'waiting';
+        state.doubleDownUsed          = false;
+        state.scores                  = {};
+        state.round                   = 1;
+        state.currentQuestion         = null;
+        state.instigatorVote          = null;
+        state.instigatorVoteConfirmed = false;
+        state.hasVoted                = false;
+        state.votes                   = {};
+        state.currentReader           = null;
+        state.abilityActions          = {};
+
+        showScreen('lobbyScreen');
+        if (roomId) loadPlayers(roomId);
     }
 
     function copyRoomCode() {
