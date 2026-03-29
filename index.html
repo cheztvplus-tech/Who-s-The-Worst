@@ -2904,7 +2904,9 @@ button:not(#muteBtn):active:not(:disabled) {
         currentQuestion: room.current_question,
         round: room.current_round
     });
-
+        
+    if (room.ability_actions !== undefined) state.abilityActions = room.ability_actions || {};
+        
     // Host has left — kick all remaining players back to join screen
     if (room.game_state === 'host_left') {
         if (realtimeChannel) {
