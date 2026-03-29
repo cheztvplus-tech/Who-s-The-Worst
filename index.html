@@ -2216,11 +2216,13 @@ button:not(#muteBtn):active:not(:disabled) {
 
     <script>
     function showRules() {
+        playSound('click');
         document.getElementById('rulesModal').classList.add('active');
     }
 
     function hideRules(event) {
         if (!event || event.target.id === 'rulesModal' || event.target.tagName === 'BUTTON') {
+            playSound('click');
             document.getElementById('rulesModal').classList.remove('active');
         }
     }
@@ -2239,6 +2241,13 @@ button:not(#muteBtn):active:not(:disabled) {
         doubleDown:  new Audio(SOUND_BASE + 'double-play.opus'),
         lost:        new Audio(SOUND_BASE + 'lost.opus'),
         penalty:     new Audio(SOUND_BASE + 'penalty.opus'),
+        openShop:    new Audio(SOUND_BASE + 'open-shop.opus'),
+        closeShop:   new Audio(SOUND_BASE + 'close-shop.opus'),
+        purchase:    new Audio(SOUND_BASE + 'purchase.opus'),
+        useAbility:  new Audio(SOUND_BASE + 'use-ability.opus'),
+        target:      new Audio(SOUND_BASE + 'target.opus'),
+        openBox:     new Audio(SOUND_BASE + 'open-box.opus'),
+        closeBox:    new Audio(SOUND_BASE + 'close-box.opus'),
     };
 
     // Preload all sounds
@@ -2611,6 +2620,7 @@ button:not(#muteBtn):active:not(:disabled) {
     function showAdminLogin() { showScreen('adminLoginScreen'); }
     
     function adminLogin() {
+        playSound('click');
         const password = document.getElementById('adminPassword').value;
         if (password === ADMIN_PASSWORD) {
             isAdminLoggedIn = true;
@@ -2653,6 +2663,7 @@ button:not(#muteBtn):active:not(:disabled) {
     }
 
     function switchTab(tab) {
+        playSound('click');
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         event.target.classList.add('active');
@@ -2661,6 +2672,7 @@ button:not(#muteBtn):active:not(:disabled) {
     }
 
     async function addNewQuestion() {
+        playSound('click');
         const input = document.getElementById('newQuestionInput');
         const category = document.getElementById('questionCategory');
         const text = input.value.trim();
@@ -3057,6 +3069,7 @@ button:not(#muteBtn):active:not(:disabled) {
     // ==========================================
     async function startGame() {
         if (!state.isHost) return;
+        playSound('click');
         
         console.log('Starting game...');
         console.log('Current players:', state.players.length, state.players.map(p => p.name));
@@ -3697,6 +3710,7 @@ button:not(#muteBtn):active:not(:disabled) {
     }
 
     function closeCardPeekSheet() {
+        playSound('click');
         document.getElementById('cardPeekSheet').classList.remove('open');
         document.getElementById('cardPeekOverlay').classList.remove('open');
         // Unflip the card
@@ -3708,6 +3722,7 @@ button:not(#muteBtn):active:not(:disabled) {
     }
 
     function pickSheetCard() {
+        playSound('click');
         const idx = parseInt(document.getElementById('sheetPickBtn').dataset.idx);
         // Close sheet first (no unflip — card stays flipped as "selected")
         document.getElementById('cardPeekSheet').classList.remove('open');
@@ -4247,6 +4262,7 @@ button:not(#muteBtn):active:not(:disabled) {
     }
 
     async function nextRound() {
+        playSound('click');
         try {
             const roomId = state.currentUser.room_id;
             const currentIdx = state.players.findIndex(p => p.id === state.currentReader);
@@ -4381,11 +4397,13 @@ button:not(#muteBtn):active:not(:disabled) {
 
     function hideLeaveModal(event) {
         if (!event || event.target.id === 'leaveModal' || event.target.tagName === 'BUTTON') {
+            playSound('click');
             document.getElementById('leaveModal').classList.remove('active');
         }
     }
 
     async function playAgain() {
+        playSound('click');
         const roomId = state.currentUser?.room_id;
 
         // ── Reset the room in the DB so all clients return to a clean lobby ──
@@ -4435,6 +4453,7 @@ button:not(#muteBtn):active:not(:disabled) {
     }
 
     function copyRoomCode() {
+        playSound('click');
         const code = document.getElementById('displayRoomCode').textContent;
         navigator.clipboard.writeText(code).then(() => showToast('Room code copied!'));
     }
@@ -5912,6 +5931,7 @@ function useAbility(abilityId) {
         showToast('You already have an ability active this round!');
         return;
     }
+    playSound('useAbility');
 
     if (ab.needsTarget) {
         showAbilityTargetPicker(abilityId);
@@ -5971,6 +5991,7 @@ function showAbilityTargetPicker(abilityId) {
 }
 
 function confirmAbilityTarget(abilityId, targetId, el) {
+    playSound('target');
     document.querySelectorAll('#abilityTargetModal [onclick*="confirmAbilityTarget"]').forEach(e => {
         e.style.borderColor = 'rgba(255,255,255,0.1)';
         e.style.background  = 'rgba(255,255,255,0.05)';
@@ -6061,6 +6082,7 @@ function getShopRotation() {
 }
 
 function openShop() {
+    playSound('openShop');
     const myId  = state.currentUser?.id;
     const myAP  = AP.points[myId] || 0;
     const scores = Object.entries(state.scores || {});
@@ -6098,6 +6120,7 @@ function openShop() {
 }
 
 function buyAbility(abilityId, cost) {
+    playSound('purchase');
     const myId = state.currentUser?.id;
     const myAP = AP.points[myId] || 0;
     const inv  = AP.inventory[myId] || [];
@@ -6114,6 +6137,7 @@ function buyAbility(abilityId, cost) {
 }
 
 function closeShop() {
+    playSound('closeShop');
     document.getElementById('shopModal').classList.remove('active');
     AP.renderTray();
 }
@@ -6132,6 +6156,7 @@ function showLootBox(abilityId) {
 }
 
 function openLootBox() {
+    playSound('openBox');
     const abilityId = AP.lootboxPending;
     if (!abilityId) return;
     const ab = ABILITIES[abilityId];
@@ -6146,6 +6171,7 @@ function openLootBox() {
 }
 
 function closeLootBox() {
+    playSound('closeBox');
     const abilityId = AP.lootboxPending;
     AP.lootboxPending = null;
     document.getElementById('lootBoxModal').classList.remove('active');
