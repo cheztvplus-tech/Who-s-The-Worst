@@ -2946,6 +2946,11 @@ button:not(#muteBtn):active:not(:disabled) {
     // Sync ability_actions so showResults can read them on all clients
     if (room.ability_actions !== undefined) state.abilityActions = room.ability_actions || {};
     
+    // If winner screen is already showing, don't let any room update pull us away from it
+    if (document.getElementById('winnerScreen').classList.contains('active')) return;
+    // Also guard by local state flag
+    if (state.gameState === 'winner') return;
+
     // If game is playing or results, switch to game screen
     if (state.gameState === 'playing' || state.gameState === 'results') {
         if (document.getElementById('lobbyScreen').classList.contains('active')) {
@@ -2975,10 +2980,12 @@ button:not(#muteBtn):active:not(:disabled) {
         }
     }
     
-    // Check for winner
+    // Check for winner — only trigger once, and mark game as over
     if (state.scores && Object.entries(state.scores).length > 0) {
         const winner = Object.entries(state.scores).find(([id, score]) => score >= CONFIG.POINTS_TO_WIN);
         if (winner && !document.getElementById('winnerScreen').classList.contains('active')) {
+            // Mark game over in local state so future room events are ignored
+            state.gameState = 'winner';
             showWinner(winner[0]);
         }
     }
@@ -4331,6 +4338,12 @@ button:not(#muteBtn):active:not(:disabled) {
         state.gameState = 'waiting';
         state.doubleDownUsed = false;
         state.scores = {};
+        state.round = 1;
+        state.currentQuestion = null;
+        state.instigatorVote = null;
+        state.instigatorVoteConfirmed = false;
+        state.hasVoted = false;
+        state.votes = {};
         if (state.currentUser?.room_id) {
             loadPlayers(state.currentUser.room_id);
         }
