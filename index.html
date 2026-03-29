@@ -3803,11 +3803,6 @@ button:not(#muteBtn):active:not(:disabled) {
             let usedMajorityFallback = false;
             let majorityTargetId = null;
 
-            // Load ability_actions from DB so we get all players' active abilities
-            const { data: roomData } = await supabaseClient
-                .from('rooms').select('ability_actions').eq('id', roomId).single();
-            const abilityActions = roomData?.ability_actions || {};
-
             // Count votes from non-instigator players
             const voterEntries = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
 
