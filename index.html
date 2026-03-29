@@ -5533,102 +5533,107 @@ console.log('✨ Enhancement pack: Alive Players + Spotlight + Juicy Cards loade
 
 <script>
 /* ╔══════════════════════════════════════════════════════════════╗
-   ║              ABILITY SYSTEM CORE  v2 — FULLY WORKING       ║
+   ║           ABILITY SYSTEM v3 — FULLY CORRECTED               ║
+   ║  All abilities fixed per spec:                              ║
+   ║  • Pills cleared at round start                             ║
+   ║  • Dice Roll: instant, no pill, correct effect logic        ║
+   ║  • Marked Target: pill shows target name                    ║
+   ║  • Anonymous: hides voter name AND target in results        ║
+   ║  • Reflect: votes aimed at reflector bounce back            ║
+   ║  • Triple Threat: ×3 correct / −3 wrong                    ║
+   ║  • Immunity: removes you from vote options                  ║
+   ║  • Vote Shuffle: randomises all voter targets               ║
    ╚══════════════════════════════════════════════════════════════╝ */
 
 /* ── ABILITY DEFINITIONS ── */
 const ABILITIES = {
-    // ── OFFENSIVE (4) ──
     triple_threat: {
         id: 'triple_threat', icon: '💥', name: 'Triple Threat',
-        desc: 'Your vote counts as 3 this round',
+        desc: 'Correct = +3 pts. Wrong = −3 pts. High risk, high reward.',
         rarity: 'rare', cost: 80, type: 'offensive',
-        useTiming: 'before_vote'
+        useTiming: 'before_vote', showPill: true
     },
     marked_target: {
         id: 'marked_target', icon: '🎯', name: 'Marked Target',
-        desc: "If others also guess your target → +1 bonus point each",
+        desc: 'Pick a player — anyone who votes for them gets +1 bonus point.',
         rarity: 'common', cost: 40, type: 'offensive',
-        useTiming: 'before_vote'
+        useTiming: 'before_vote', needsTarget: true, showPill: true
     },
     curse: {
         id: 'curse', icon: '🔥', name: 'Curse',
-        desc: 'Pick a player — if they get voted this round, they lose 1 pt',
+        desc: 'Pick a player — if anyone votes them this round, they lose 1 pt.',
         rarity: 'rare', cost: 70, type: 'offensive',
-        useTiming: 'before_vote', needsTarget: true
+        useTiming: 'before_vote', needsTarget: true, showPill: true
     },
     anon_strike: {
         id: 'anon_strike', icon: '🕶️', name: 'Anonymous',
-        desc: 'Your vote is hidden in results — nobody knows it was you',
+        desc: 'Your vote target is hidden from everyone in the results.',
         rarity: 'common', cost: 35, type: 'offensive',
-        useTiming: 'before_vote'
+        useTiming: 'before_vote', showPill: true
     },
-    // ── DEFENSIVE (3) ──
     immunity: {
         id: 'immunity', icon: '🛡️', name: 'Immunity',
-        desc: "You can't be voted this round — removed from options",
+        desc: "You're removed from everyone's vote options this round.",
         rarity: 'rare', cost: 75, type: 'defensive',
-        useTiming: 'before_vote'
+        useTiming: 'before_vote', showPill: true
     },
     reflect: {
         id: 'reflect', icon: '🪞', name: 'Reflect',
-        desc: "Any player who votes for you — gets that vote reflected back onto them",
+        desc: "Players who vote for you get their vote reflected back — they score/lose as if they voted for themselves.",
         rarity: 'epic', cost: 100, type: 'defensive',
-        useTiming: 'before_vote'
+        useTiming: 'before_vote', showPill: true
     },
     second_chance: {
         id: 'second_chance', icon: '❤️', name: 'Second Chance',
-        desc: "If you lose a point this round — cancel it",
+        desc: "If you'd lose a point this round — cancel it.",
         rarity: 'common', cost: 45, type: 'defensive',
-        useTiming: 'before_vote'
+        useTiming: 'before_vote', showPill: true
     },
-    // ── CHAOS (2) ──
     vote_shuffle: {
         id: 'vote_shuffle', icon: '🔀', name: 'Vote Shuffle',
-        desc: 'Randomly swaps ALL votes before reveal — pure chaos',
+        desc: 'Randomly swaps ALL voter targets before reveal — pure chaos.',
         rarity: 'epic', cost: 90, type: 'chaos',
-        useTiming: 'before_reveal', instigatorOnly: false
+        useTiming: 'before_vote', showPill: true
     },
     dice_roll: {
         id: 'dice_roll', icon: '🎲', name: 'Dice Roll',
-        desc: 'Random effect: ×2 pts / −1 pt / steal 1 pt / nothing',
+        desc: 'Instant: +2 pts / −1 pt / steal 1 pt from someone / nothing. No pill — acts immediately.',
         rarity: 'common', cost: 30, type: 'chaos',
-        useTiming: 'before_vote'
+        useTiming: 'instant', showPill: false  // no pill — instant effect
     },
-    // ── RARE (1) ──
     kingmaker: {
         id: 'kingmaker', icon: '👑', name: 'Kingmaker',
-        desc: 'Choose who wins this round — they get the points instead',
+        desc: 'Choose who wins this round — they get all the points instead.',
         rarity: 'legendary', cost: 150, type: 'rare',
-        useTiming: 'before_reveal', needsTarget: true
+        useTiming: 'before_vote', needsTarget: true, showPill: true
     }
 };
 
-/* Shop rotation — 4 random abilities shown each round */
+/* ── Shop rotation per round ── */
 const SHOP_POOL = Object.keys(ABILITIES);
 
-/* ── ABILITY POINTS state (per player, local + synced via room metadata) ── */
+/* ── ABILITY POINTS state ── */
 const AP = {
-    points: {},         // playerId → AP amount
-    inventory: {},      // playerId → [abilityId, ...]  (owned but unused)
+    points: {},          // playerId → AP amount
+    inventory: {},       // playerId → [abilityId, ...]
     activeThisRound: {}, // playerId → {abilityId, params}
-    streaks: {},        // playerId → consecutive correct vote count
-    lootboxPending: null, // ability to give after modal closes
-    diceBonus: null,
+    streaks: {},
+    lootboxPending: null,
 
-    get myAP() { return AP.points[state.currentUser?.id] || 0; },
+    get myAP()        { return AP.points[state.currentUser?.id] || 0; },
     get myInventory() { return AP.inventory[state.currentUser?.id] || []; },
 
-    /* ── Persistence ── */
-    _saveKey() { return `wtw_ap_${state.roomCode || 'default'}_${state.currentUser?.id || 'x'}`; },
+    _saveKey() {
+        return `wtw_ap_${state.roomCode || 'default'}_${state.currentUser?.id || 'x'}`;
+    },
     save() {
         try {
             const myId = state.currentUser?.id;
             if (!myId) return;
             localStorage.setItem(AP._saveKey(), JSON.stringify({
-                points: AP.points[myId] || 0,
+                points:    AP.points[myId]    || 0,
                 inventory: AP.inventory[myId] || [],
-                streaks: AP.streaks[myId] || 0
+                streaks:   AP.streaks[myId]   || 0
             }));
         } catch(e) {}
     },
@@ -5639,9 +5644,9 @@ const AP = {
             const raw = localStorage.getItem(AP._saveKey());
             if (!raw) return;
             const data = JSON.parse(raw);
-            AP.points[myId] = data.points || 0;
+            AP.points[myId]    = data.points    || 0;
             AP.inventory[myId] = data.inventory || [];
-            AP.streaks[myId] = data.streaks || 0;
+            AP.streaks[myId]   = data.streaks   || 0;
         } catch(e) {}
     },
     clearSave() {
@@ -5661,16 +5666,30 @@ const AP = {
     },
     giveAbility(playerId, abilityId) {
         if (!AP.inventory[playerId]) AP.inventory[playerId] = [];
-        // Max 4 ability slots
-        if (AP.inventory[playerId].length >= 4) {
-            AP.inventory[playerId].shift(); // drop oldest if full
-        }
+        if (AP.inventory[playerId].length >= 4) AP.inventory[playerId].shift();
         AP.inventory[playerId].push(abilityId);
         AP.renderTray();
         AP.save();
     },
+
+    /* Activate an ability — removes from inventory, registers as active */
     activateAbility(abilityId, params = {}) {
         const me = state.currentUser?.id;
+        const ab = ABILITIES[abilityId];
+        if (!ab) return;
+
+        // Dice Roll is instant — no active registration needed
+        if (ab.useTiming === 'instant') {
+            // Remove from inventory
+            const inv = AP.inventory[me] || [];
+            const idx = inv.indexOf(abilityId);
+            if (idx > -1) inv.splice(idx, 1);
+            AP.inventory[me] = inv;
+            AP.renderTray();
+            AP.save();
+            return;
+        }
+
         AP.activeThisRound[me] = { abilityId, params };
         // Remove from inventory
         const inv = AP.inventory[me] || [];
@@ -5680,16 +5699,12 @@ const AP = {
         AP.renderTray();
         AP.showUsedEffect(abilityId);
         AP.save();
-        // Persist active ability to DB so revealVotes (on host) can see it
         AP._syncActiveToRoom(me, abilityId, params);
     },
 
-    /* Sync active ability into the room's ability_actions column (JSON).
-       Uses a read-modify-write with retry to avoid concurrent overwrites. */
     async _syncActiveToRoom(playerId, abilityId, params) {
         try {
             if (!state.currentUser?.room_id) return;
-            // Retry up to 3 times to handle concurrent updates
             for (let attempt = 0; attempt < 3; attempt++) {
                 const { data: room } = await supabaseClient
                     .from('rooms').select('ability_actions').eq('id', state.currentUser.room_id).single();
@@ -5699,10 +5714,8 @@ const AP = {
                     .from('rooms').update({ ability_actions: actions })
                     .eq('id', state.currentUser.room_id);
                 if (!error) break;
-                // Small jitter before retry
                 await new Promise(r => setTimeout(r, 50 + Math.random() * 100));
             }
-            // Also update local state so the tray reflects activation immediately
             state.abilityActions = state.abilityActions || {};
             state.abilityActions[playerId] = { abilityId, params };
         } catch(e) { console.warn('AP sync error:', e); }
@@ -5711,16 +5724,16 @@ const AP = {
     getMyActive() {
         return AP.activeThisRound[state.currentUser?.id] || null;
     },
+
+    /* Called at start of every new round — clears pills + active flags */
     resetRound() {
-        // Don't clear inventory, only clear active flags
         AP.activeThisRound = {};
-        AP.diceBonus = null;
         AP.renderTray();
         AP.renderBar();
         AP.save();
     },
 
-    /* ── Render AP bar — shows AP + active ability icon pill ── */
+    /* ── Render AP bar ── */
     renderBar() {
         let bar = document.getElementById('apBar');
         if (!bar) {
@@ -5729,26 +5742,44 @@ const AP = {
             const scoreboard = document.getElementById('scoreboard');
             if (scoreboard) scoreboard.after(bar);
         }
-        const myId = state.currentUser?.id;
-        const myAP = AP.points[myId] || 0;
+        const myId  = state.currentUser?.id;
+        const myAP  = AP.points[myId] || 0;
         const active = AP.activeThisRound[myId];
-        const activeAb = active ? ABILITIES[active.abilityId] : null;
-        const activePill = activeAb
-            ? `<div class="ap-chip" style="border-color:rgba(254,202,87,0.7);background:rgba(254,202,87,0.12);animation:abilityActivePulse 1.5s ease-in-out infinite;" title="${activeAb.name} active this round">${activeAb.icon} <span style="font-size:0.72rem;font-weight:700;color:#fff;">${activeAb.name}</span></div>`
+        const ab     = active ? ABILITIES[active.abilityId] : null;
+
+        // Build pill label — Marked Target shows target name, others show ability name
+        let pillLabel = '';
+        if (ab && ab.showPill !== false) {
+            if (ab.id === 'marked_target' && active.params?.targetId) {
+                const tname = state.players.find(p => p.id === active.params.targetId)?.name || '?';
+                pillLabel = `${ab.icon} Marked: ${tname}`;
+            } else if (ab.id === 'curse' && active.params?.targetId) {
+                const tname = state.players.find(p => p.id === active.params.targetId)?.name || '?';
+                pillLabel = `${ab.icon} Cursed: ${tname}`;
+            } else if (ab.id === 'kingmaker' && active.params?.targetId) {
+                const tname = state.players.find(p => p.id === active.params.targetId)?.name || '?';
+                pillLabel = `${ab.icon} King: ${tname}`;
+            } else {
+                pillLabel = `${ab.icon} ${ab.name}`;
+            }
+        }
+
+        const activePill = pillLabel
+            ? `<div class="ap-chip" style="border-color:rgba(254,202,87,0.7);background:rgba(254,202,87,0.12);animation:abilityActivePulse 1.5s ease-in-out infinite;" title="${ab.name} active this round">${pillLabel}</div>`
             : '';
+
         bar.innerHTML = `<div class="ap-chip me">⚡ <span class="ap-num">${myAP}</span> AP</div>${activePill}`;
         const lbl = document.getElementById('myApLabel');
         if (lbl) lbl.textContent = `${myAP} AP`;
     },
 
-    /* ── Render ability tray in voter view ── */
+    /* ── Render ability tray (4 slots) ── */
     renderTray() {
-        let tray = document.getElementById('abilityTray');
+        const tray = document.getElementById('abilityTray');
         if (!tray) return;
         const myId = state.currentUser?.id;
-        const inv = AP.inventory[myId] || [];
+        const inv  = AP.inventory[myId] || [];
 
-        // 4 slots
         const slots = [0,1,2,3].map(i => {
             const abilId = inv[i];
             if (!abilId) return `<div class="ability-slot empty"><span class="ability-icon" style="opacity:0.2">🔳</span><div class="ability-name" style="opacity:0.3">Empty</div></div>`;
@@ -5765,7 +5796,6 @@ const AP = {
         tray.querySelector('.ability-slots').innerHTML = slots;
     },
 
-    /* ── Floating "ability used" effect ── */
     showUsedEffect(abilityId) {
         const ab = ABILITIES[abilityId];
         if (!ab) return;
@@ -5778,7 +5808,9 @@ const AP = {
     }
 };
 
-/* ── Ability tray in voter view HTML injection ── */
+/* ══════════════════════════════════════
+   ABILITY TRAY INJECTION
+══════════════════════════════════════ */
 function injectAbilityTray() {
     if (document.getElementById('abilityTray')) return;
     const voterView = document.getElementById('voterView');
@@ -5791,45 +5823,52 @@ function injectAbilityTray() {
         </h4>
         <div class="ability-slots"></div>
     `;
-    // Append at end of voterView — always visible
     voterView.appendChild(tray);
     AP.renderTray();
 }
 
 /* ══════════════════════════════════════
-   USE ABILITY
+   USE ABILITY — entry point
 ══════════════════════════════════════ */
 function useAbility(abilityId) {
     const ab = ABILITIES[abilityId];
     if (!ab) return;
     const myId = state.currentUser?.id;
-    const inv = AP.inventory[myId] || [];
+    const inv  = AP.inventory[myId] || [];
     if (!inv.includes(abilityId)) return;
 
-    // Abilities needing target open a picker
+    // Don't allow stacking — one active ability per round (except dice which is instant)
+    if (AP.activeThisRound[myId] && ab.useTiming !== 'instant') {
+        showToast('You already have an ability active this round!');
+        return;
+    }
+
     if (ab.needsTarget) {
         showAbilityTargetPicker(abilityId);
         return;
     }
 
-    // Kingmaker / Vote Shuffle active before reveal — just mark
-    if (ab.useTiming === 'before_reveal') {
-        AP.activateAbility(abilityId);
-        showToast(`${ab.icon} ${ab.name} queued — activates at reveal!`);
-        return;
-    }
-
-    // Dice Roll — resolve immediately
-    if (abilityId === 'dice_roll') {
-        const diceResult = resolveDiceRoll();
-        AP.activateAbility(abilityId, { diceResult });
+    if (ab.useTiming === 'instant') {
+        // DICE ROLL — immediate, no pill
+        resolveDiceRoll(abilityId);
         return;
     }
 
     AP.activateAbility(abilityId);
-    showToast(`${ab.icon} ${ab.name} is active this round!`);
+
+    // Friendly toast per ability
+    const msgs = {
+        triple_threat:  '💥 Triple Threat active — +3 if right, −3 if wrong!',
+        anon_strike:    '🕶️ Anonymous active — your target is hidden!',
+        immunity:       '🛡️ Immunity active — you\'re off the board!',
+        reflect:        '🪞 Reflect active — votes aimed at you bounce back!',
+        second_chance:  '❤️ Second Chance active — one point loss cancelled!',
+        vote_shuffle:   '🔀 Vote Shuffle active — votes scrambled at reveal!',
+    };
+    showToast(msgs[abilityId] || `${ab.icon} ${ab.name} active this round!`, 3000);
 }
 
+/* ── Target picker for abilities that need a target ── */
 function showAbilityTargetPicker(abilityId) {
     const ab = ABILITIES[abilityId];
     const targets = state.players.filter(p => p.id !== state.currentUser?.id);
@@ -5844,8 +5883,13 @@ function showAbilityTargetPicker(abilityId) {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                 ${targets.map(p => `
                     <div onclick="confirmAbilityTarget('${abilityId}','${p.id}',this)"
-                         style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px;text-align:center;cursor:pointer;transition:all 0.2s;">
-                        <div style="width:36px;height:36px;border-radius:50%;${avatarColor(p.name)};display:flex;align-items:center;justify-content:center;font-weight:bold;color:#fff;margin:0 auto 6px;">${p.name[0].toUpperCase()}</div>
+                         style="background:rgba(255,255,255,0.05);border:2px solid rgba(255,255,255,0.1);
+                                border-radius:12px;padding:12px;text-align:center;cursor:pointer;transition:all 0.2s;">
+                        <div style="width:36px;height:36px;border-radius:50%;${avatarColor(p.name)};
+                                    display:flex;align-items:center;justify-content:center;
+                                    font-weight:bold;color:#fff;margin:0 auto 6px;">
+                            ${p.name[0].toUpperCase()}
+                        </div>
                         <div style="font-size:0.85rem;font-weight:700;">${p.name}</div>
                     </div>
                 `).join('')}
@@ -5859,43 +5903,81 @@ function showAbilityTargetPicker(abilityId) {
 function confirmAbilityTarget(abilityId, targetId, el) {
     document.querySelectorAll('#abilityTargetModal [onclick*="confirmAbilityTarget"]').forEach(e => {
         e.style.borderColor = 'rgba(255,255,255,0.1)';
-        e.style.background = 'rgba(255,255,255,0.05)';
+        e.style.background  = 'rgba(255,255,255,0.05)';
     });
     el.style.borderColor = '#2ecc71';
-    el.style.background = 'rgba(46,204,113,0.15)';
+    el.style.background  = 'rgba(46,204,113,0.15)';
 
     setTimeout(() => {
         document.getElementById('abilityTargetModal')?.remove();
         AP.activateAbility(abilityId, { targetId });
         const ab = ABILITIES[abilityId];
         const targetName = state.players.find(p => p.id === targetId)?.name || '?';
-        showToast(`${ab.icon} ${ab.name} set on ${targetName}!`);
+        showToast(`${ab.icon} ${ab.name} → ${targetName}!`, 3000);
     }, 400);
 }
 
-function resolveDiceRoll() {
+/* ══════════════════════════════════════
+   DICE ROLL — instant effect
+══════════════════════════════════════ */
+async function resolveDiceRoll(abilityId) {
     const myId = state.currentUser?.id;
     const roll = Math.floor(Math.random() * 4);
-    const diceResults = ['double', 'minus', 'ap_bonus', 'nothing'];
-    const diceResult = diceResults[roll];
-    const msgs = {
-        double: '🎲 Double points this round!',
-        minus: '🎲 -1 point this round!',
-        ap_bonus: '🎲 +20 AP bonus!',
-        nothing: '🎲 Nothing happened… lucky?'
-    };
-    showToast(msgs[diceResult], 4000);
-    if (diceResult === 'ap_bonus') AP.addAP(myId, 20);
-    // Store diceResult in params so revealVotes can use it
-    return diceResult;
+    // 0=+2pts  1=−1pt  2=steal1pt  3=nothing
+    const outcomes = ['+2pts', '-1pt', 'steal', 'nothing'];
+    const outcome  = outcomes[roll];
+
+    // Remove from inventory immediately (instant-use)
+    AP.activateAbility(abilityId);   // clears inventory entry without registering as active
+
+    if (outcome === '+2pts') {
+        // Add 2 to this player's game score directly
+        const newScores = { ...state.scores };
+        newScores[myId] = (newScores[myId] || 0) + 2;
+        state.scores = newScores;
+        await supabaseClient.from('rooms').update({ scores: newScores }).eq('id', state.currentUser.room_id);
+        AP.addAP(myId, 10); // small AP bonus too
+        showToast('🎲 Dice Roll: +2 points!', 3500);
+        updateScoreboard();
+        launchConfetti();
+
+    } else if (outcome === '-1pt') {
+        const newScores = { ...state.scores };
+        newScores[myId] = Math.max(0, (newScores[myId] || 0) - 1);
+        state.scores = newScores;
+        await supabaseClient.from('rooms').update({ scores: newScores }).eq('id', state.currentUser.room_id);
+        showToast('🎲 Dice Roll: −1 point. Unlucky!', 3500);
+        updateScoreboard();
+        haptic([40, 20, 40]);
+
+    } else if (outcome === 'steal') {
+        // Pick a random OTHER player who has >0 points to steal from
+        const candidates = state.players.filter(p => p.id !== myId && (state.scores[p.id] || 0) > 0);
+        if (candidates.length === 0) {
+            showToast('🎲 Dice Roll: Steal — but nobody has points to steal!', 3500);
+        } else {
+            const victim = candidates[Math.floor(Math.random() * candidates.length)];
+            const newScores = { ...state.scores };
+            newScores[victim.id] = Math.max(0, (newScores[victim.id] || 0) - 1);
+            newScores[myId]      = (newScores[myId] || 0) + 1;
+            state.scores = newScores;
+            await supabaseClient.from('rooms').update({ scores: newScores }).eq('id', state.currentUser.room_id);
+            showToast(`🎲 Dice Roll: Stole 1 point from ${victim.name}!`, 4000);
+            updateScoreboard();
+            haptic([20, 10, 30]);
+        }
+
+    } else {
+        showToast('🎲 Dice Roll: Nothing happened… this time.', 3000);
+    }
+
+    AP.renderTray();
 }
 
 /* ══════════════════════════════════════
    SHOP
 ══════════════════════════════════════ */
-let _shopRotation = [];
 function getShopRotation() {
-    // Rotate 5 abilities per round, seeded by round number
     const seed = (state.round || 1) * 7;
     const pool = [...SHOP_POOL];
     const result = [];
@@ -5909,28 +5991,26 @@ function getShopRotation() {
 }
 
 function openShop() {
-    const myId = state.currentUser?.id;
-    const myAP = AP.points[myId] || 0;
-
-    // Underdog: lowest score gets 50% discount
+    const myId  = state.currentUser?.id;
+    const myAP  = AP.points[myId] || 0;
     const scores = Object.entries(state.scores || {});
     const minScore = scores.length ? Math.min(...scores.map(([,s]) => s)) : 0;
-    const myScore = state.scores[myId] || 0;
-    const isUnderdog = myScore <= minScore && scores.length > 1;
+    const myScore  = state.scores[myId] || 0;
+    const maxScore = scores.length ? Math.max(...scores.map(([,s]) => s)) : 0;
+    const isUnderdog = myScore <= minScore && scores.length > 1 && maxScore - myScore >= 2;
 
     document.getElementById('shopApDisplay').textContent = myAP;
     document.getElementById('underdogNotice').style.display = isUnderdog ? 'block' : 'none';
 
     const rotation = getShopRotation();
-    const myInv = AP.inventory[myId] || [];
-    const grid = document.getElementById('shopGrid');
+    const myInv   = AP.inventory[myId] || [];
+    const grid    = document.getElementById('shopGrid');
 
     grid.innerHTML = rotation.map(abilId => {
         const ab = ABILITIES[abilId];
         if (!ab) return '';
-        const baseCost = ab.cost;
-        const cost = isUnderdog ? Math.floor(baseCost * 0.5) : baseCost;
-        const owned = myInv.includes(abilId);
+        const cost      = isUnderdog ? Math.floor(ab.cost * 0.5) : ab.cost;
+        const owned     = myInv.includes(abilId);
         const cantAfford = !owned && myAP < cost;
         return `
             <div class="shop-item ${owned ? 'owned' : cantAfford ? 'cant-afford' : ''}"
@@ -5950,10 +6030,10 @@ function openShop() {
 function buyAbility(abilityId, cost) {
     const myId = state.currentUser?.id;
     const myAP = AP.points[myId] || 0;
-    const inv = AP.inventory[myId] || [];
+    const inv  = AP.inventory[myId] || [];
 
     if (inv.includes(abilityId)) { showToast('Already owned!'); return; }
-    if (myAP < cost) { showToast('Not enough AP! Keep guessing correctly.'); return; }
+    if (myAP < cost)              { showToast('Not enough AP! Keep guessing correctly.'); return; }
 
     AP.spendAP(cost);
     AP.giveAbility(myId, abilityId);
@@ -5974,9 +6054,10 @@ function closeShop() {
 function showLootBox(abilityId) {
     AP.lootboxPending = abilityId;
     const modal = document.getElementById('lootBoxModal');
-    document.getElementById('lootBoxIcon').textContent = '📦';
+    document.getElementById('lootBoxIcon').textContent    = '📦';
     document.getElementById('lootBoxReveal').style.display = 'none';
-    document.getElementById('lootBoxSub').textContent = 'Tap the box to open your reward!';
+    document.getElementById('lootBoxSub').textContent      = 'Tap the box to open your reward!';
+    document.getElementById('lootBoxIcon').style.animation = '';
     modal.classList.add('active');
 }
 
@@ -5984,12 +6065,12 @@ function openLootBox() {
     const abilityId = AP.lootboxPending;
     if (!abilityId) return;
     const ab = ABILITIES[abilityId];
-    document.getElementById('lootBoxIcon').textContent = '✨';
-    document.getElementById('lootBoxIcon').style.animation = 'none';
+    document.getElementById('lootBoxIcon').textContent        = '✨';
+    document.getElementById('lootBoxIcon').style.animation    = 'none';
     document.getElementById('lootBoxAbilityIcon').textContent = ab.icon;
     document.getElementById('lootBoxAbilityName').textContent = ab.name;
     document.getElementById('lootBoxAbilityDesc').textContent = ab.desc;
-    document.getElementById('lootBoxReveal').style.display = 'block';
+    document.getElementById('lootBoxReveal').style.display    = 'block';
     haptic([20, 40, 20, 60]);
     launchConfetti();
 }
@@ -6007,7 +6088,6 @@ function closeLootBox() {
 }
 
 function getLootBoxAbility() {
-    // 60% common, 25% rare, 12% epic, 3% legendary
     const r = Math.random();
     let pool;
     if (r < 0.03)      pool = Object.values(ABILITIES).filter(a => a.rarity === 'legendary');
@@ -6019,7 +6099,7 @@ function getLootBoxAbility() {
 }
 
 /* ══════════════════════════════════════
-   STREAK TRACKER + REWARDS
+   STREAK BANNER
 ══════════════════════════════════════ */
 function showStreakBanner(text) {
     const el = document.getElementById('streakBanner');
@@ -6036,29 +6116,23 @@ function checkUnderdogReward() {
     const myId = state.currentUser?.id;
     if (!myId || !state.scores) return;
     const thisRound = state.round || 1;
-    if (_underdogGivenForRound === thisRound) return; // already gave it this round
+    if (_underdogGivenForRound === thisRound) return;
 
-    const scores = Object.entries(state.scores);
+    const scores   = Object.entries(state.scores);
     if (scores.length < 2) return;
     const minScore = Math.min(...scores.map(([,s]) => s));
-    const myScore = state.scores[myId] || 0;
-    // Only underdog if strictly the lowest AND at least 2 points behind the leader
     const maxScore = Math.max(...scores.map(([,s]) => s));
+    const myScore  = state.scores[myId] || 0;
     if (myScore > minScore || maxScore - myScore < 2) return;
 
     _underdogGivenForRound = thisRound;
     const inv = AP.inventory[myId] || [];
-
     if (state.doubleDownPenalty === 'minus_two' && !inv.includes('second_chance')) {
         AP.giveAbility(myId, 'second_chance');
         showToast('🛡️ Underdog bonus: Free Second Chance!', 4000);
     }
-    // No free AP — AP comes from guessing right/wrong
 }
 
-/* ══════════════════════════════════════
-   LOOT BOX EVERY 3 ROUNDS
-══════════════════════════════════════ */
 function checkLootBoxDrop() {
     if (!state.round) return;
     if (state.round % 3 === 0) {
@@ -6067,219 +6141,519 @@ function checkLootBoxDrop() {
 }
 
 /* ══════════════════════════════════════
-   APPLY ABILITIES IN revealVotes
-   All ability effects are baked into the
-   score calculation BEFORE the DB write.
+   PATCH revealVotes — full ability scoring
 ══════════════════════════════════════ */
+const _origRevealVotes = window.revealVotes;
+window.revealVotes = async function() {
+    // Override the full reveal with ability-aware scoring
+    haptic([10, 40, 80]);
+    playSound('reveal');
+    const btn = document.getElementById('revealBtn');
+    btn.disabled = true;
+    btn.textContent = 'Revealing...';
+
+    try {
+        const roomId          = state.currentUser.room_id;
+        const instigatorTarget = state.instigatorVote;
+        const newScores        = { ...state.scores };
+        const penalty          = state.doubleDownPenalty || 'lose_card';
+        let majorityTargetId   = null;
+
+        // Load DB ability_actions
+        const { data: roomData } = await supabaseClient
+            .from('rooms').select('ability_actions').eq('id', roomId).single();
+        const abilityActions = roomData?.ability_actions || {};
+
+        // All voter entries (non-instigator)
+        let voterEntries = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
+
+        /* ── VOTE SHUFFLE: randomise targets ── */
+        const shufflerEntry = Object.entries(abilityActions).find(([, a]) => a.abilityId === 'vote_shuffle');
+        if (shufflerEntry) {
+            const targets = voterEntries.map(([, v]) => ({ ...v }));
+            const shuffledTargets = targets.map(v => v.target);
+            for (let i = shuffledTargets.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffledTargets[i], shuffledTargets[j]] = [shuffledTargets[j], shuffledTargets[i]];
+            }
+            voterEntries = voterEntries.map(([id, vote], i) => [id, { ...vote, target: shuffledTargets[i] }]);
+        }
+
+        /* ── IMMUNITY: remove immune players as valid targets ── */
+        const immunePlayers = new Set(
+            Object.entries(abilityActions)
+                .filter(([, a]) => a.abilityId === 'immunity')
+                .map(([id]) => id)
+        );
+
+        /* ── REFLECT set ── */
+        const reflectors = new Set(
+            Object.entries(abilityActions)
+                .filter(([, a]) => a.abilityId === 'reflect')
+                .map(([id]) => id)
+        );
+
+        /* ── CURSE targets ── */
+        const cursedTargets = {};
+        Object.entries(abilityActions).forEach(([curserId, a]) => {
+            if (a.abilityId === 'curse' && a.params?.targetId) {
+                cursedTargets[a.params.targetId] = curserId;
+            }
+        });
+
+        /* ── KINGMAKER override ── */
+        const kingmakerEntry  = Object.entries(abilityActions).find(([, a]) => a.abilityId === 'kingmaker');
+        const kingmakerTarget = kingmakerEntry?.[1]?.params?.targetId || null;
+
+        /* ── Effective instigator target (immune players can't be hit) ── */
+        const effectiveTarget = immunePlayers.has(instigatorTarget) ? null : instigatorTarget;
+
+        const matchers      = voterEntries.filter(([, v]) => v.target === effectiveTarget && effectiveTarget);
+        const anyMatched    = matchers.length > 0;
+
+        /* ── KINGMAKER: override who wins ── */
+        if (kingmakerTarget) {
+            newScores[kingmakerTarget] = (newScores[kingmakerTarget] || 0) + 2;
+
+        } else if (anyMatched) {
+            matchers.forEach(([voterId, vote]) => {
+                const ab = abilityActions[voterId];
+
+                // REFLECT: if this voter aimed at a reflector, their vote bounces — no points
+                if (reflectors.has(vote.target)) {
+                    if (vote.doubleDown) {
+                        if (penalty === 'minus_two') newScores[voterId] = (newScores[voterId] || 0) - 2;
+                        if (penalty === 'reusable')  supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
+                    }
+                    return;
+                }
+
+                // TRIPLE THREAT: ×3 points if correct
+                const weight = (ab?.abilityId === 'triple_threat') ? 3 : 1;
+                const base   = vote.doubleDown ? 2 : 1;
+                let pts      = base * weight;
+
+                // MARKED TARGET: voter of the marked target gets +1 per other voter on same target
+                if (ab?.abilityId === 'marked_target') {
+                    const sameCount = voterEntries.filter(([oid, ov]) => oid !== voterId && ov.target === vote.target).length;
+                    pts += sameCount;
+                }
+                // Also: anyone voting for a marked-target player gets +1 (target is marked by someone else)
+                const markerEntry = Object.entries(abilityActions).find(([mid, a]) => mid !== voterId && a.abilityId === 'marked_target' && a.params?.targetId === vote.target);
+                if (markerEntry) {
+                    pts += 1;
+                }
+
+                newScores[voterId] = (newScores[voterId] || 0) + pts;
+            });
+
+            // Wrong voters who used Double Play: apply penalty
+            const wrongDoubles = voterEntries.filter(([, v]) => v.doubleDown && v.target !== effectiveTarget);
+            wrongDoubles.forEach(([voterId, vote]) => {
+                const ab = abilityActions[voterId];
+                // SECOND CHANCE cancels penalty
+                if (ab?.abilityId === 'second_chance') return;
+                if (penalty === 'minus_two') newScores[voterId] = (newScores[voterId] || 0) - 2;
+                if (penalty === 'reusable')  supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
+            });
+
+            // TRIPLE THREAT wrong: −3
+            voterEntries.filter(([vid, vote]) => {
+                const ab = abilityActions[vid];
+                return ab?.abilityId === 'triple_threat' && vote.target !== effectiveTarget && !reflectors.has(vote.target);
+            }).forEach(([vid]) => {
+                const ab = abilityActions[vid];
+                if (ab?.abilityId === 'second_chance') return;
+                newScores[vid] = (newScores[vid] || 0) - 3;
+            });
+
+        } else {
+            // Nobody matched — majority fallback
+            const voteCounts = {};
+            voterEntries.forEach(([, v]) => {
+                if (!immunePlayers.has(v.target)) {
+                    voteCounts[v.target] = (voteCounts[v.target] || 0) + 1;
+                }
+            });
+            let maxVotes = 0;
+            Object.entries(voteCounts).forEach(([target, count]) => {
+                if (count > maxVotes) { maxVotes = count; majorityTargetId = target; }
+            });
+
+            voterEntries.forEach(([voterId, vote]) => {
+                const ab      = abilityActions[voterId];
+                const correct = vote.target === majorityTargetId;
+                if (reflectors.has(vote.target) && correct) return; // reflect cancels
+
+                const weight = (ab?.abilityId === 'triple_threat') ? 3 : 1;
+                if (correct) {
+                    const base = vote.doubleDown ? 2 : 1;
+                    let pts    = base * weight;
+                    if (ab?.abilityId === 'marked_target') {
+                        const sc = voterEntries.filter(([oid, ov]) => oid !== voterId && ov.target === vote.target).length;
+                        pts += sc;
+                    }
+                    const markerEntry = Object.entries(abilityActions).find(([mid, a]) => mid !== voterId && a.abilityId === 'marked_target' && a.params?.targetId === vote.target);
+                    if (markerEntry) pts += 1;
+                    newScores[voterId] = (newScores[voterId] || 0) + pts;
+                } else {
+                    if (vote.doubleDown) {
+                        if (ab?.abilityId === 'second_chance') return;
+                        if (penalty === 'minus_two') newScores[voterId] = (newScores[voterId] || 0) - 2;
+                        if (penalty === 'reusable')  supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
+                    }
+                    if (ab?.abilityId === 'triple_threat') {
+                        if (ab?.abilityId === 'second_chance') return;
+                        newScores[voterId] = (newScores[voterId] || 0) - 3;
+                    }
+                }
+            });
+        }
+
+        /* ── CURSE: −1 if cursed player was voted ── */
+        Object.entries(cursedTargets).forEach(([targetId]) => {
+            const wasVoted = voterEntries.some(([, v]) => v.target === targetId);
+            if (wasVoted) newScores[targetId] = Math.max(0, (newScores[targetId] || 0) - 1);
+        });
+
+        /* ── REFLECT: negate points for those who aimed at a reflector ── */
+        voterEntries.forEach(([voterId, vote]) => {
+            if (reflectors.has(vote.target) && voterId !== vote.target) {
+                // They lost their correct score — already handled by early-return above
+                // Additionally apply double-down penalty if applicable
+                if (vote.doubleDown) {
+                    const ab = abilityActions[voterId];
+                    if (ab?.abilityId !== 'second_chance') {
+                        if (penalty === 'minus_two') newScores[voterId] = (newScores[voterId] || 0) - 2;
+                    }
+                }
+            }
+        });
+
+        // No negatives
+        Object.keys(newScores).forEach(id => { if (newScores[id] < 0) newScores[id] = 0; });
+
+        const { error } = await supabaseClient.from('rooms').update({
+            game_state:       'results',
+            scores:           newScores,
+            last_majority:    majorityTargetId,
+            majority_fallback: !anyMatched && !kingmakerTarget,
+        }).eq('id', roomId);
+
+        if (error) throw error;
+
+    } catch (error) {
+        console.error('Reveal error:', error);
+        showToast('Failed to reveal: ' + error.message);
+        btn.disabled    = false;
+        btn.textContent = '🎉 Reveal Votes';
+    }
+};
 
 /* ══════════════════════════════════════
-   PATCH showResults — AP grants + cosmetic effects
-   Uses a round stamp to ensure AP is granted
-   exactly once per player per round.
+   PATCH showResults — full ability-aware display
 ══════════════════════════════════════ */
-
-// Track which round AP was last granted for this player
 let _apGrantedForRound = -1;
 
-const _origShowResults = window.showResults;
 window.showResults = function() {
-    _origShowResults.apply(this, arguments);
+    // ── Run base UI setup (question card, instigator pick display, continue btn) ──
+    document.getElementById('readerView').style.display  = 'none';
+    document.getElementById('voterView').style.display   = 'none';
+    document.getElementById('resultsView').style.display = 'block';
 
-    const myId = state.currentUser?.id;
-    if (!myId) return;
+    document.getElementById('resultQuestion').textContent = state.currentQuestion || '';
+    const pickedPlayer = state.players.find(p => p.id === state.instigatorVote);
+    document.getElementById('instigatorPickDisplay').textContent = pickedPlayer ? pickedPlayer.name : '???';
 
-    // ── Only grant AP once per round ──
-    const thisRound = state.round || 1;
-    if (_apGrantedForRound === thisRound) {
-        // Already granted this round — just re-render bar
-        AP.renderBar();
-        AP.renderTray();
-        return;
-    }
-    _apGrantedForRound = thisRound;
-
-    const voterEntries = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
+    const abilityActions   = { ...(state.abilityActions || {}) };
+    const voterEntries     = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
     const instigatorTarget = state.instigatorVote;
-    const anyMatched = voterEntries.some(([, v]) => v.target === instigatorTarget);
+    const penalty          = state.doubleDownPenalty || 'lose_card';
 
+    /* ── VOTE SHUFFLE detection (display only) ── */
+    const shufflerEntry = Object.entries(abilityActions).find(([, a]) => a.abilityId === 'vote_shuffle');
+    const shufflerName  = shufflerEntry ? state.players.find(p => p.id === shufflerEntry[0])?.name : null;
+
+    /* ── REFLECT set (display) ── */
+    const reflectors    = new Set(Object.entries(abilityActions).filter(([,a]) => a.abilityId === 'reflect').map(([id]) => id));
+    const reflectNames  = [...reflectors].map(id => state.players.find(p => p.id === id)?.name).filter(Boolean);
+
+    /* ── IMMUNITY set ── */
+    const immunePlayers = new Set(Object.entries(abilityActions).filter(([,a]) => a.abilityId === 'immunity').map(([id]) => id));
+    const effectiveTarget = immunePlayers.has(instigatorTarget) ? null : instigatorTarget;
+
+    const anyMatched = voterEntries.some(([, v]) => v.target === effectiveTarget && effectiveTarget);
     let majorityTargetId = null;
+
     if (!anyMatched) {
         const voteCounts = {};
-        voterEntries.forEach(([, v]) => { voteCounts[v.target] = (voteCounts[v.target] || 0) + 1; });
+        voterEntries.forEach(([, v]) => {
+            if (!immunePlayers.has(v.target)) voteCounts[v.target] = (voteCounts[v.target] || 0) + 1;
+        });
         let maxVotes = 0;
         Object.entries(voteCounts).forEach(([target, count]) => {
             if (count > maxVotes) { maxVotes = count; majorityTargetId = target; }
         });
+        const mc = document.getElementById('majorityFallbackCard');
+        if (mc) {
+            mc.style.display = 'block';
+            document.getElementById('majorityTarget').textContent = state.players.find(p => p.id === majorityTargetId)?.name || '?';
+        }
+    } else {
+        const mc = document.getElementById('majorityFallbackCard');
+        if (mc) mc.style.display = 'none';
     }
 
-    // ── Grant AP for this player only ──
-    if (myId === state.currentReader) {
-        // Instigator always gets 20 AP for running the round
-        AP.addAP(myId, 20);
-        setTimeout(() => showToast('🎯 +20 AP for being the Instigator!', 2500), 400);
-    } else {
-        const myVote = state.votes[myId];
-        if (myVote) {
-            const correct = anyMatched
-                ? myVote.target === instigatorTarget
-                : myVote.target === majorityTargetId;
+    // KINGMAKER
+    const kingEntry  = Object.entries(abilityActions).find(([,a]) => a.abilityId === 'kingmaker');
+    const kingTarget = kingEntry?.[1]?.params?.targetId;
 
-            if (correct) {
-                AP.addAP(myId, 20);
-                setTimeout(() => showToast('✅ +20 AP — correct guess!', 2500), 400);
-                // Streak tracking (only increments on correct)
-                if (!AP.streaks[myId]) AP.streaks[myId] = 0;
-                AP.streaks[myId]++;
-                const streak = AP.streaks[myId];
-                if (streak === 3) {
-                    showStreakBanner('🔥 3 correct in a row! Random ability!');
-                    setTimeout(() => showLootBox(getLootBoxAbility()), 1400);
-                } else if (streak === 5) {
-                    showStreakBanner('💥 5 STREAK! Rare ability incoming!');
-                    const rarePool = Object.values(ABILITIES).filter(a => a.rarity === 'rare' || a.rarity === 'epic');
-                    setTimeout(() => showLootBox(rarePool[Math.floor(Math.random() * rarePool.length)].id), 1400);
-                } else if (streak === 6) {
-                    showStreakBanner('👑 6 STREAK! LEGENDARY!');
-                    const legendPool = Object.values(ABILITIES).filter(a => a.rarity === 'legendary');
-                    setTimeout(() => showLootBox(legendPool[Math.floor(Math.random() * legendPool.length)].id), 1400);
-                } else if (streak >= 2) {
-                    showStreakBanner(`🔥 ${streak}x Streak!`);
-                }
-            } else {
-                AP.addAP(myId, 10);
-                setTimeout(() => showToast('❌ +10 AP — wrong guess', 2000), 400);
-                AP.streaks[myId] = 0;
+    const instigatorPlayer = state.players.find(p => p.id === state.currentReader);
+    let rows = [];
+
+    // Vote shuffle banner
+    if (shufflerName) {
+        rows.push(`<div class="result-item" style="border-left-color:#48dbfb;background:rgba(72,219,251,0.07);">
+            <div style="width:100%;text-align:center;font-size:0.82rem;color:#48dbfb;font-weight:700;">
+                🔀 ${shufflerName} used Vote Shuffle — all votes scrambled!
+            </div></div>`);
+    }
+    // Reflect banner
+    if (reflectNames.length) {
+        rows.push(`<div class="result-item" style="border-left-color:#c39eff;background:rgba(163,84,255,0.07);">
+            <div style="width:100%;text-align:center;font-size:0.82rem;color:#c39eff;font-weight:700;">
+                🪞 ${reflectNames.join(', ')} used Reflect — votes aimed at them bounce back!
+            </div></div>`);
+    }
+    // Kingmaker banner
+    if (kingTarget) {
+        const kname = state.players.find(p => p.id === kingTarget)?.name || '?';
+        const kuser = state.players.find(p => p.id === kingEntry[0])?.name || '?';
+        rows.push(`<div class="result-item" style="border-left-color:#feca57;background:rgba(254,202,87,0.07);">
+            <div style="width:100%;text-align:center;font-size:0.82rem;color:#feca57;font-weight:700;">
+                👑 ${kuser} used Kingmaker — ${kname} wins the round!
+            </div></div>`);
+    }
+
+    // Instigator row
+    if (instigatorPlayer) {
+        rows.push(`<div class="result-item" style="border-left-color:#feca57;opacity:0.7;">
+            <div>
+                <div class="voter-name">🎯 ${instigatorPlayer.name} <span style="font-size:0.7rem;color:#feca57;">(Instigator)</span></div>
+                <div class="voted-for">picked ${pickedPlayer?.name || '?'}</div>
+            </div>
+            <div style="color:#a0a0a0;font-size:0.9rem;">No pts</div>
+        </div>`);
+    }
+
+    // Voter rows
+    voterEntries.forEach(([voterId, vote]) => {
+        const voter  = state.players.find(p => p.id === voterId);
+        const target = state.players.find(p => p.id === vote.target);
+        const ab     = abilityActions[voterId];
+
+        const isAnon        = ab?.abilityId === 'anon_strike';
+        const isTriple      = ab?.abilityId === 'triple_threat';
+        const isMarked      = ab?.abilityId === 'marked_target';
+        const isReflected   = reflectors.has(vote.target);
+        const isImmune      = immunePlayers.has(vote.target);
+
+        // Determine correct
+        let correct = false;
+        if (anyMatched)  correct = vote.target === effectiveTarget && !!effectiveTarget && !isReflected;
+        else             correct = vote.target === majorityTargetId && !isReflected;
+
+        // Points calculation for display
+        let pts = 0, penaltyText = '';
+        if (kingTarget) {
+            // Kingmaker round — only kingmaker's chosen wins
+            correct = vote.target === kingTarget || voterId === kingEntry?.[0];
+            pts = voterId === kingEntry?.[0] ? 0 : vote.target === kingTarget ? (vote.doubleDown ? 2 : 1) : 0;
+        } else if (correct) {
+            const weight = isTriple ? 3 : 1;
+            pts = (vote.doubleDown ? 2 : 1) * weight;
+            // Marked target: +1 per other voter on same target
+            if (isMarked) {
+                const sc = voterEntries.filter(([oid, ov]) => oid !== voterId && ov.target === vote.target).length;
+                pts += sc;
             }
-
-            // ── Ability feedback toasts ──
-            const myActive = AP.activeThisRound[myId];
-            if (myActive) {
-                const ab = ABILITIES[myActive.abilityId];
-                if (ab) {
-                    setTimeout(() => {
-                        if (myActive.abilityId === 'second_chance' && !correct) {
-                            showToast('❤️ Second Chance cancelled your point loss!', 4000);
-                        } else if (myActive.abilityId === 'triple_threat' && correct) {
-                            showToast('💥 Triple Threat: your vote counted ×3!', 4000);
-                        } else if (myActive.abilityId === 'dice_roll') {
-                            showToast('🎲 Dice Roll applied to your score!', 3000);
-                        } else if (myActive.abilityId === 'anon_strike') {
-                            showToast('🕶️ Anonymous: your name was hidden in results!', 3000);
-                        } else if (myActive.abilityId === 'immunity') {
-                            showToast('🛡️ Immunity: you were removed from vote targets!', 3000);
-                        } else if (myActive.abilityId === 'kingmaker') {
-                            const target = state.players.find(p => p.id === myActive.params?.targetId);
-                            showToast(`👑 Kingmaker gave the round to ${target?.name || '?'}!`, 4000);
-                        } else if (myActive.abilityId === 'marked_target' && correct) {
-                            const sameVoters = voterEntries.filter(([oid, ov]) => oid !== myId && ov.target === myVote.target).length;
-                            if (sameVoters > 0) {
-                                AP.addAP(myId, sameVoters * 10);
-                                showToast(`🎯 Marked Target! +${sameVoters * 10} AP bonus!`, 4000);
-                            }
-                        } else if (myActive.abilityId === 'curse') {
-                            const cursedId = myActive.params?.targetId;
-                            const cursedPlayer = state.players.find(p => p.id === cursedId);
-                            const wasVoted = voterEntries.some(([, v]) => v.target === cursedId);
-                            if (wasVoted && cursedPlayer) showToast(`🔥 Curse hit ${cursedPlayer.name}!`, 4000);
-                        } else if (myActive.abilityId === 'reflect') {
-                            const reflectedOn = voterEntries.filter(([, v]) => v.target === myId);
-                            if (reflectedOn.length > 0) {
-                                const names = reflectedOn.map(([id]) => state.players.find(p => p.id === id)?.name).filter(Boolean);
-                                showToast(`🪞 Reflect blocked ${names.join(', ')}!`, 4000);
-                            }
-                        } else if (myActive.abilityId === 'vote_shuffle') {
-                            showToast('🔀 Vote Shuffle scrambled all votes!', 3500);
-                        }
-                    }, 900);
-                }
+            const markerEntry2 = Object.entries(abilityActions).find(([mid, a]) => mid !== voterId && a.abilityId === 'marked_target' && a.params?.targetId === vote.target);
+            if (markerEntry2) pts += 1;
+        } else {
+            if (isTriple) { pts = -3; penaltyText = '💥 Triple Threat backfire!'; }
+            if (vote.doubleDown && ab?.abilityId !== 'second_chance') {
+                if (penalty === 'minus_two') { penaltyText = '💀 -2 pts'; pts = isTriple ? pts - 2 : -2; }
+                else if (penalty === 'reusable') { penaltyText = '♻️ Card lost'; if (!isTriple) pts = 0; }
+                else { penaltyText = '🃏 Lost Double Play'; if (!isTriple) pts = 0; }
+            } else if (vote.doubleDown && ab?.abilityId === 'second_chance') {
+                penaltyText = '❤️ Second Chance saved you!'; pts = 0;
             }
         }
+
+        /* ── ANONYMOUS: hide voter name and target ── */
+        const displayName   = isAnon ? `<span style="color:#6c6c7e;font-style:italic;">🕶️ ???</span>` : (voter?.name || 'Unknown');
+        const displayTarget = isAnon ? `<span style="color:#6c6c7e;">???</span>` : (target?.name || 'Unknown');
+        const displayPoints = isAnon
+            ? `<div class="points-earned" style="color:#6c6c7e;">?</div>`
+            : `<div class="points-earned" style="color:${pts > 0 ? '#2ecc71' : pts < 0 ? '#ff4757' : '#a0a0a0'}">${pts > 0 ? '+'+pts : pts < 0 ? pts : '0'}</div>`;
+
+        // Ability tag lines
+        let abilityTag = '';
+        if (isAnon)                                     abilityTag = `<div style="font-size:0.68rem;color:#6c6c7e;margin-top:2px;">🕶️ Identity hidden</div>`;
+        else if (isTriple && correct)                   abilityTag = `<div style="font-size:0.68rem;color:#48dbfb;margin-top:2px;">💥 Triple Threat ×3</div>`;
+        else if (isTriple && !correct)                  abilityTag = `<div style="font-size:0.68rem;color:#ff4757;margin-top:2px;">💥 Triple Threat backfire −3</div>`;
+        else if (isMarked && correct) {
+            const sc = voterEntries.filter(([oid, ov]) => oid !== voterId && ov.target === vote.target).length;
+            if (sc > 0)                                 abilityTag = `<div style="font-size:0.68rem;color:#feca57;margin-top:2px;">🎯 Marked Target +${sc} bonus</div>`;
+        }
+        if (isReflected && !isAnon)                     abilityTag += `<div style="font-size:0.68rem;color:#c39eff;margin-top:2px;">🪞 Reflected — vote bounced back</div>`;
+        if (isImmune && !isAnon && vote.target !== effectiveTarget)
+                                                         abilityTag += `<div style="font-size:0.68rem;color:#54a0ff;margin-top:2px;">🛡️ Target was immune</div>`;
+
+        const rowClass = isAnon ? '' : (correct ? 'correct' : 'wrong');
+
+        rows.push(`<div class="result-item ${rowClass}" ${isAnon ? 'style="border-left-color:#4a4a5a;"' : ''}>
+            <div>
+                <div class="voter-name">${displayName}</div>
+                <div class="voted-for">guessed → ${displayTarget}</div>
+                ${vote.doubleDown && !isAnon ? `<div style="color:#f5576c;font-size:0.75rem;margin-top:2px;">🚀 Double Play${penaltyText ? ' · '+penaltyText : ''}</div>` : (!isAnon && penaltyText ? `<div style="color:#ff4757;font-size:0.75rem;">${penaltyText}</div>` : '')}
+                ${abilityTag}
+            </div>
+            ${displayPoints}
+        </div>`);
+    });
+
+    document.getElementById('resultsList').innerHTML = rows.join('');
+    updateScoreboard();
+    setTimeout(animateResultItems, 80);
+
+    // Sounds + confetti
+    haptic([30, 50, 30]);
+    const anyCorrect = voterEntries.some(([vid, vote]) => {
+        if (vid === state.currentReader) return false;
+        return anyMatched ? vote.target === instigatorTarget : vote.target === majorityTargetId;
+    });
+    if (anyCorrect) setTimeout(launchConfetti, 300);
+
+    const myVote = state.votes[state.currentUser?.id];
+    if (state.currentUser?.id !== state.currentReader && myVote) {
+        const myCorrect  = anyMatched ? myVote.target === instigatorTarget : myVote.target === majorityTargetId;
+        const myPenalty  = !myCorrect && myVote.doubleDown;
+        setTimeout(() => {
+            if      (myPenalty && penalty === 'minus_two')  playSound('penalty');
+            else if (myPenalty)                              playSound('lost');
+            else if (myCorrect)                              playSound('correct');
+            else                                             playSound('wrong');
+        }, 400);
     }
 
-    // ── Loot box every 3 rounds (once only) ──
-    setTimeout(checkLootBoxDrop, 1500);
+    // Continue button
+    const continueBtn = document.getElementById('continueBtn');
+    if (state.isHost) { continueBtn.classList.remove('hidden'); continueBtn.textContent = 'Continue'; continueBtn.disabled = false; }
+    else               { continueBtn.classList.add('hidden'); }
 
+    // AP grants (deduplicated per round)
+    const myId2     = state.currentUser?.id;
+    const thisRound = state.round || 1;
+    if (myId2 && _apGrantedForRound !== thisRound) {
+        _apGrantedForRound = thisRound;
+        if (myId2 === state.currentReader) {
+            AP.addAP(myId2, 20);
+            setTimeout(() => showToast('🎯 +20 AP for being the Instigator!', 2500), 400);
+        } else if (myVote) {
+            const myCorrect2 = anyMatched ? myVote.target === instigatorTarget : myVote.target === majorityTargetId;
+            if (myCorrect2) {
+                AP.addAP(myId2, 20);
+                setTimeout(() => showToast('✅ +20 AP — correct guess!', 2500), 400);
+                if (!AP.streaks[myId2]) AP.streaks[myId2] = 0;
+                AP.streaks[myId2]++;
+                const streak = AP.streaks[myId2];
+                if (streak === 3) { showStreakBanner('🔥 3 in a row!'); setTimeout(() => showLootBox(getLootBoxAbility()), 1400); }
+                else if (streak === 5) { showStreakBanner('💥 5 STREAK!'); const rp = Object.values(ABILITIES).filter(a=>a.rarity==='rare'||a.rarity==='epic'); setTimeout(()=>showLootBox(rp[Math.floor(Math.random()*rp.length)].id),1400); }
+                else if (streak === 6) { showStreakBanner('👑 6 STREAK! LEGENDARY!'); const lp=Object.values(ABILITIES).filter(a=>a.rarity==='legendary'); setTimeout(()=>showLootBox(lp[Math.floor(Math.random()*lp.length)].id),1400); }
+                else if (streak >= 2) showStreakBanner(`🔥 ${streak}x Streak!`);
+            } else {
+                AP.addAP(myId2, 10);
+                setTimeout(() => showToast('❌ +10 AP — wrong guess', 2000), 400);
+                AP.streaks[myId2] = 0;
+            }
+        }
+        setTimeout(checkLootBoxDrop, 1500);
+    }
     AP.renderBar();
     AP.renderTray();
 };
 
 /* ══════════════════════════════════════
-   PATCH nextRound TO RESET ABILITIES
+   PATCH nextRound — clear abilities & pills
 ══════════════════════════════════════ */
-const _origNextRound = window.nextRound;
+const _origNextRoundAP = window.nextRound;
 window.nextRound = async function() {
-    AP.resetRound();
-    AP.diceBonus = null;
-    _apGrantedForRound = -1;
+    AP.resetRound();         // clears activeThisRound → removes all pills
+    _apGrantedForRound   = -1;
     _underdogGivenForRound = -1;
-    return _origNextRound.apply(this, arguments);
+    return _origNextRoundAP.apply(this, arguments);
 };
 
 /* ══════════════════════════════════════
-   PATCH initGameView TO INJECT TRAY
+   PATCH initGameView — inject tray + load AP
 ══════════════════════════════════════ */
-const _origInitGameView4 = window.initGameView;
+const _origInitGameViewAP = window.initGameView;
 window.initGameView = function() {
-    AP.load(); // restore AP from localStorage on refresh
-    _origInitGameView4.apply(this, arguments);
+    AP.load();
+    _origInitGameViewAP.apply(this, arguments);
     setTimeout(() => {
         injectAbilityTray();
         AP.renderBar();
         AP.renderTray();
-        const lbl = document.getElementById('myApLabel');
-        if (lbl) lbl.textContent = `${AP.myAP} AP`;
+        checkUnderdogReward();
     }, 350);
 };
 
 /* ══════════════════════════════════════
-   PATCH updateVoteOptions FOR IMMUNITY
-   Remove immune players from the vote grid
-   — reads both local activeThisRound AND DB-synced abilityActions
+   PATCH updateVoteOptions — hide immune players
 ══════════════════════════════════════ */
-const _origUpdateVoteOptions = window.updateVoteOptions;
+const _origUpdateVoteOptionsAP = window.updateVoteOptions;
 window.updateVoteOptions = function() {
-    // Merge local active abilities + DB-synced actions
-    const allActions = { ...(state.abilityActions || {}), ...AP.activeThisRound };
+    const allActions    = { ...(state.abilityActions || {}), ...AP.activeThisRound };
     const immunePlayers = Object.entries(allActions)
         .filter(([, a]) => a.abilityId === 'immunity')
         .map(([id]) => id);
 
     if (immunePlayers.length > 0) {
         const originalPlayers = state.players;
+        // Keep the instigator in state.players but hide immune non-instigators from the vote grid
         state.players = state.players.filter(p => !immunePlayers.includes(p.id) || p.id === state.currentReader);
-        _origUpdateVoteOptions.apply(this, arguments);
+        _origUpdateVoteOptionsAP.apply(this, arguments);
         state.players = originalPlayers;
-        // Tell immune player they're hidden
         if (immunePlayers.includes(state.currentUser?.id)) {
-            showToast('🛡️ Immunity active — you\'re hidden from votes this round!', 3500);
+            setTimeout(() => showToast("🛡️ Immunity active — you've been removed from the vote board!", 4000), 300);
         }
     } else {
-        _origUpdateVoteOptions.apply(this, arguments);
+        _origUpdateVoteOptionsAP.apply(this, arguments);
     }
 };
 
 /* ══════════════════════════════════════
-   PATCH startGame TO INIT AP STATE
+   PATCH startGame — init AP for all players
 ══════════════════════════════════════ */
-const _origStartGame = window.startGame;
+const _origStartGameAP = window.startGame;
 window.startGame = async function() {
     state.players.forEach(p => {
-        if (!AP.points[p.id]) AP.points[p.id] = 0;
+        if (!AP.points[p.id])    AP.points[p.id]    = 0;
         if (!AP.inventory[p.id]) AP.inventory[p.id] = [];
-        if (!AP.streaks[p.id]) AP.streaks[p.id] = 0;
+        if (!AP.streaks[p.id])   AP.streaks[p.id]   = 0;
     });
-    return _origStartGame.apply(this, arguments);
+    return _origStartGameAP.apply(this, arguments);
 };
 
-/* Clicking outside shop closes it */
+/* Close shop when clicking outside */
 document.getElementById('shopModal').addEventListener('click', function(e) {
     if (e.target === this) closeShop();
 });
 
-console.log('⚡ Ability System v2 loaded — bugs fixed, all abilities wired up');
+console.log('⚡ Ability System v3 loaded — all abilities fully corrected');
 </script>
-        
-<!-- ===== CARD PEEK BOTTOM SHEET ===== -->
 <div id="cardPeekOverlay" onclick="closeCardPeekSheet()"></div>
 <div id="cardPeekSheet">
     <div class="sheet-handle"></div>
