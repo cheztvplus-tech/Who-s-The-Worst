@@ -2047,7 +2047,7 @@ button:not(#muteBtn):active:not(:disabled) {
             <div class="round-indicator" id="roundIndicator">
             <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
                 <span style="font-size: 1.1rem;">🎮</span>
-                <span>Round <span id="roundNum">1</span> of 7</span>
+                <span>Round <span id="roundNum">1</span></span>
                 <span style="font-size: 1.1rem;">👑</span>
             </div>
             <div class="round-progress-container">
@@ -3771,30 +3771,107 @@ button:not(#muteBtn):active:not(:disabled) {
             let usedMajorityFallback = false;
             let majorityTargetId = null;
 
+            // Load ability_actions from DB so we get all players' active abilities
+            const { data: roomData } = await supabaseClient
+                .from('rooms').select('ability_actions').eq('id', roomId).single();
+            const abilityActions = roomData?.ability_actions || {};
+
             // Count votes from non-instigator players
             const voterEntries = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
 
-            // Who matched the instigator's pick?
-            const matchers = voterEntries.filter(([, vote]) => vote.target === instigatorTarget);
-            // Players who doubled down but were wrong
-            const wrongDoubleDowners = voterEntries.filter(([, vote]) => vote.doubleDown && vote.target !== instigatorTarget);
-
-            if (matchers.length > 0) {
-                // Matched players earn points
-                matchers.forEach(([voterId, vote]) => {
-                    const points = vote.doubleDown ? 2 : 1;
-                    newScores[voterId] = (newScores[voterId] || 0) + points;
+            // ── VOTE SHUFFLE: randomize targets before scoring ──
+            const shufflerEntry = Object.entries(abilityActions).find(([, a]) => a.abilityId === 'vote_shuffle');
+            if (shufflerEntry) {
+                const voterIds = voterEntries.map(([id]) => id);
+                const targets = voterEntries.map(([, v]) => v.target);
+                for (let i = targets.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [targets[i], targets[j]] = [targets[j], targets[i]];
+                }
+                voterIds.forEach((id, i) => {
+                    const entry = voterEntries.find(([vid]) => vid === id);
+                    if (entry) entry[1] = { ...entry[1], target: targets[i] };
                 });
+            }
+
+            // ── IMMUNITY: remove immune players as valid targets ──
+            const immunePlayers = new Set(
+                Object.entries(abilityActions)
+                    .filter(([, a]) => a.abilityId === 'immunity')
+                    .map(([id]) => id)
+            );
+
+            // ── REFLECT: build reflect set ──
+            const reflectors = new Set(
+                Object.entries(abilityActions)
+                    .filter(([, a]) => a.abilityId === 'reflect')
+                    .map(([id]) => id)
+            );
+
+            // ── CURSE: cursed targets ──
+            const cursedTargets = {};
+            Object.entries(abilityActions).forEach(([curserId, a]) => {
+                if (a.abilityId === 'curse' && a.params?.targetId) {
+                    cursedTargets[a.params.targetId] = curserId;
+                }
+            });
+
+            // ── KINGMAKER: override winner ──
+            const kingmakerEntry = Object.entries(abilityActions).find(([, a]) => a.abilityId === 'kingmaker');
+            const kingmakerTarget = kingmakerEntry?.[1]?.params?.targetId || null;
+
+            // ── Determine who matched, respecting immunity ──
+            const effectiveTarget = immunePlayers.has(instigatorTarget) ? null : instigatorTarget;
+            const matchers = voterEntries.filter(([, vote]) => vote.target === effectiveTarget && effectiveTarget);
+            const wrongVoters = voterEntries.filter(([, vote]) => vote.target !== effectiveTarget || !effectiveTarget);
+            const wrongDoubleDowners = voterEntries.filter(([, vote]) => vote.doubleDown && (vote.target !== effectiveTarget || !effectiveTarget));
+
+            if (kingmakerTarget) {
+                // Kingmaker overrides: that player gets all the points this round
+                newScores[kingmakerTarget] = (newScores[kingmakerTarget] || 0) + 2;
+            } else if (matchers.length > 0) {
+                matchers.forEach(([voterId, vote]) => {
+                    // REFLECT: if this voter voted for a reflector, the vote bounces back on them
+                    if (reflectors.has(vote.target)) {
+                        // No point for them, they get reflected (they voted the wrong effective person)
+                        if (vote.doubleDown) {
+                            if (penalty === 'minus_two') newScores[voterId] = (newScores[voterId] || 0) - 2;
+                            if (penalty === 'reusable') supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
+                        }
+                        return;
+                    }
+
+                    // TRIPLE THREAT: voter's match counts as 3
+                    const ab = abilityActions[voterId];
+                    const weight = ab?.abilityId === 'triple_threat' ? 3 : 1;
+                    const base = vote.doubleDown ? 2 : 1;
+                    let pts = base * weight;
+
+                    // DICE ROLL: apply bonus/penalty
+                    if (ab?.abilityId === 'dice_roll' && ab?.params?.diceResult !== undefined) {
+                        pts = ab.params.diceResult === 'double' ? pts * 2
+                            : ab.params.diceResult === 'minus' ? Math.max(0, pts - 1) : pts;
+                    }
+
+                    // SECOND CHANCE: if they would lose points, cancel it — but for correct voters they gain, so irrelevant
+                    newScores[voterId] = (newScores[voterId] || 0) + pts;
+
+                    // MARKED TARGET bonus: if others also voted this same target, +1 AP per matcher (handled client-side)
+                });
+
                 // Wrong Double-Players: apply penalty
-                wrongDoubleDowners.forEach(([voterId]) => {
+                wrongDoubleDowners.forEach(([voterId, vote]) => {
+                    const ab = abilityActions[voterId];
+                    // SECOND CHANCE: cancel the penalty
+                    if (ab?.abilityId === 'second_chance') {
+                        // No penalty applied
+                        return;
+                    }
                     if (penalty === 'minus_two') {
                         newScores[voterId] = (newScores[voterId] || 0) - 2;
                     }
-                    // 'lose_card': no point change, card already marked used
-                    // 'reusable': mark card as used (burned on wrong guess)
                     if (penalty === 'reusable') {
                         supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
-                        if (voterId === state.currentUser?.id) state.currentUser.double_down_used = true;
                     }
                 });
             } else {
@@ -3802,26 +3879,41 @@ button:not(#muteBtn):active:not(:disabled) {
                 usedMajorityFallback = true;
                 const voteCounts = {};
                 voterEntries.forEach(([, vote]) => {
-                    voteCounts[vote.target] = (voteCounts[vote.target] || 0) + 1;
+                    if (!immunePlayers.has(vote.target)) {
+                        voteCounts[vote.target] = (voteCounts[vote.target] || 0) + 1;
+                    }
                 });
                 let maxVotes = 0;
                 Object.entries(voteCounts).forEach(([target, count]) => {
                     if (count > maxVotes) { maxVotes = count; majorityTargetId = target; }
                 });
                 voterEntries.forEach(([voterId, vote]) => {
+                    const ab = abilityActions[voterId];
+                    const weight = ab?.abilityId === 'triple_threat' ? 3 : 1;
                     if (vote.target === majorityTargetId) {
-                        newScores[voterId] = (newScores[voterId] || 0) + (vote.doubleDown ? 2 : 1);
+                        const base = vote.doubleDown ? 2 : 1;
+                        newScores[voterId] = (newScores[voterId] || 0) + base * weight;
                     } else if (vote.doubleDown) {
+                        // SECOND CHANCE cancels penalty
+                        if (ab?.abilityId === 'second_chance') return;
                         if (penalty === 'minus_two') {
                             newScores[voterId] = (newScores[voterId] || 0) - 2;
                         }
                         if (penalty === 'reusable') {
                             supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
-                            if (voterId === state.currentUser?.id) state.currentUser.double_down_used = true;
                         }
                     }
                 });
             }
+
+            // ── CURSE: subtract 1 from cursed player if they were voted ──
+            Object.entries(cursedTargets).forEach(([targetId]) => {
+                const wasVoted = voterEntries.some(([, v]) => v.target === targetId);
+                if (wasVoted) newScores[targetId] = (newScores[targetId] || 0) - 1;
+            });
+
+            // Ensure no negative scores
+            Object.keys(newScores).forEach(id => { if (newScores[id] < 0) newScores[id] = 0; });
 
             const { error } = await supabaseClient
                 .from('rooms')
@@ -3829,7 +3921,8 @@ button:not(#muteBtn):active:not(:disabled) {
                     game_state: 'results',
                     scores: newScores,
                     last_majority: majorityTargetId,
-                    majority_fallback: usedMajorityFallback
+                    majority_fallback: usedMajorityFallback,
+                    ability_actions: {} // clear after use
                 })
                 .eq('id', roomId);
             
@@ -4114,6 +4207,9 @@ button:not(#muteBtn):active:not(:disabled) {
         state.doubleDownUsed = false;
         state.hasVoted = false;
         state.scores = {};
+        // Clear AP local state
+        try { AP.clearSave(); } catch(e) {}
+        AP.points = {}; AP.inventory = {}; AP.activeThisRound = {}; AP.streaks = {};
         
         // Always reset the join button so it's never stuck in loading state
         const joinBtn = document.getElementById('joinBtn');
@@ -5399,18 +5495,50 @@ const AP = {
     activeThisRound: {}, // playerId → {abilityId, params}
     streaks: {},        // playerId → consecutive correct vote count
     lootboxPending: null, // ability to give after modal closes
+    diceBonus: null,
 
     get myAP() { return AP.points[state.currentUser?.id] || 0; },
     get myInventory() { return AP.inventory[state.currentUser?.id] || []; },
 
+    /* ── Persistence ── */
+    _saveKey() { return `wtw_ap_${state.roomCode || 'default'}_${state.currentUser?.id || 'x'}`; },
+    save() {
+        try {
+            const myId = state.currentUser?.id;
+            if (!myId) return;
+            localStorage.setItem(AP._saveKey(), JSON.stringify({
+                points: AP.points[myId] || 0,
+                inventory: AP.inventory[myId] || [],
+                streaks: AP.streaks[myId] || 0
+            }));
+        } catch(e) {}
+    },
+    load() {
+        try {
+            const myId = state.currentUser?.id;
+            if (!myId) return;
+            const raw = localStorage.getItem(AP._saveKey());
+            if (!raw) return;
+            const data = JSON.parse(raw);
+            AP.points[myId] = data.points || 0;
+            AP.inventory[myId] = data.inventory || [];
+            AP.streaks[myId] = data.streaks || 0;
+        } catch(e) {}
+    },
+    clearSave() {
+        try { localStorage.removeItem(AP._saveKey()); } catch(e) {}
+    },
+
     addAP(playerId, amount) {
         AP.points[playerId] = (AP.points[playerId] || 0) + amount;
         AP.renderBar();
+        AP.save();
     },
     spendAP(amount) {
         const me = state.currentUser?.id;
         AP.points[me] = Math.max(0, (AP.points[me] || 0) - amount);
         AP.renderBar();
+        AP.save();
     },
     giveAbility(playerId, abilityId) {
         if (!AP.inventory[playerId]) AP.inventory[playerId] = [];
@@ -5420,6 +5548,7 @@ const AP = {
         }
         AP.inventory[playerId].push(abilityId);
         AP.renderTray();
+        AP.save();
     },
     activateAbility(abilityId, params = {}) {
         const me = state.currentUser?.id;
@@ -5431,15 +5560,37 @@ const AP = {
         AP.inventory[me] = inv;
         AP.renderTray();
         AP.showUsedEffect(abilityId);
+        AP.save();
+        // Persist active ability to DB so revealVotes (on host) can see it
+        AP._syncActiveToRoom(me, abilityId, params);
     },
+
+    /* Sync active ability into the room's ability_actions column (JSON) */
+    async _syncActiveToRoom(playerId, abilityId, params) {
+        try {
+            if (!state.currentUser?.room_id) return;
+            // Store in a separate table row or piggyback on votes table via a special field
+            // We'll use the votes table's double_down field isn't enough — 
+            // instead we append to a room metadata column
+            const { data: room } = await supabaseClient
+                .from('rooms').select('ability_actions').eq('id', state.currentUser.room_id).single();
+            const actions = room?.ability_actions || {};
+            actions[playerId] = { abilityId, params };
+            await supabaseClient.from('rooms').update({ ability_actions: actions })
+                .eq('id', state.currentUser.room_id);
+        } catch(e) { console.warn('AP sync error:', e); }
+    },
+
     getMyActive() {
         return AP.activeThisRound[state.currentUser?.id] || null;
     },
     resetRound() {
         // Don't clear inventory, only clear active flags
         AP.activeThisRound = {};
+        AP.diceBonus = null;
         AP.renderTray();
         AP.renderBar();
+        AP.save();
     },
 
     /* ── Render AP bar below scoreboard ── */
@@ -5452,13 +5603,11 @@ const AP = {
             if (scoreboard) scoreboard.after(bar);
         }
         const myId = state.currentUser?.id;
-        bar.innerHTML = state.players.map(p => {
-            const ap = AP.points[p.id] || 0;
-            const isMe = p.id === myId;
-            return `<div class="ap-chip ${isMe ? 'me' : ''}">
-                ⚡ <span class="ap-num">${ap}</span> ${p.name.split(' ')[0]}
-            </div>`;
-        }).join('');
+        const myAP = AP.points[myId] || 0;
+        bar.innerHTML = `<div class="ap-chip me">⚡ <span class="ap-num">${myAP}</span> AP</div>`;
+        // Also update the tray label
+        const lbl = document.getElementById('myApLabel');
+        if (lbl) lbl.textContent = `${myAP} AP`;
     },
 
     /* ── Render ability tray in voter view ── */
@@ -5541,8 +5690,8 @@ function useAbility(abilityId) {
 
     // Dice Roll — resolve immediately
     if (abilityId === 'dice_roll') {
-        resolveDiceRoll();
-        AP.activateAbility(abilityId);
+        const diceResult = resolveDiceRoll();
+        AP.activateAbility(abilityId, { diceResult });
         return;
     }
 
@@ -5596,15 +5745,18 @@ function confirmAbilityTarget(abilityId, targetId, el) {
 function resolveDiceRoll() {
     const myId = state.currentUser?.id;
     const roll = Math.floor(Math.random() * 4);
-    const outcomes = [
-        { msg: '🎲 Double points this round!', effect: () => { AP.diceBonus = 2; } },
-        { msg: '🎲 -1 point this round!', effect: () => { AP.diceBonus = -1; } },
-        { msg: '🎲 +20 AP bonus!', effect: () => AP.addAP(myId, 20) },
-        { msg: '🎲 Nothing happened… lucky?', effect: () => {} }
-    ];
-    const chosen = outcomes[roll];
-    showToast(chosen.msg, 4000);
-    chosen.effect();
+    const diceResults = ['double', 'minus', 'ap_bonus', 'nothing'];
+    const diceResult = diceResults[roll];
+    const msgs = {
+        double: '🎲 Double points this round!',
+        minus: '🎲 -1 point this round!',
+        ap_bonus: '🎲 +20 AP bonus!',
+        nothing: '🎲 Nothing happened… lucky?'
+    };
+    showToast(msgs[diceResult], 4000);
+    if (diceResult === 'ap_bonus') AP.addAP(myId, 20);
+    // Store diceResult in params so revealVotes can use it
+    return diceResult;
 }
 
 /* ══════════════════════════════════════
@@ -5753,7 +5905,7 @@ function handleStreakRewards(playerId, wasCorrect) {
         const isMe = playerId === state.currentUser?.id;
 
         // AP per correct guess
-        AP.addAP(playerId, 10);
+        AP.addAP(playerId, 20);
 
         if (isMe) {
             if (streak === 3) {
@@ -5821,49 +5973,9 @@ function checkLootBoxDrop() {
    score calculation BEFORE the DB write.
 ══════════════════════════════════════ */
 
-/* Vote Shuffle: randomise targets in state.votes so revealVotes uses shuffled data */
-function applyVoteShuffle() {
-    // Find anyone with vote_shuffle active
-    const shuffler = Object.entries(AP.activeThisRound)
-        .find(([, a]) => a.abilityId === 'vote_shuffle');
-    if (!shuffler) return false;
-
-    const voterIds = Object.keys(state.votes).filter(id => id !== state.currentReader);
-    if (voterIds.length < 2) return false;
-
-    const targets = voterIds.map(id => state.votes[id].target);
-    for (let i = targets.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [targets[i], targets[j]] = [targets[j], targets[i]];
-    }
-    voterIds.forEach((id, i) => {
-        if (state.votes[id]) state.votes[id] = { ...state.votes[id], target: targets[i] };
-    });
-    showToast('🔀 Vote Shuffle activated — chaos reigns!', 3500);
-    return true;
-}
-
-/* Intercept revealVotes to apply shuffle & triple-threat weight BEFORE scoring */
-const _origRevealVotes = window.revealVotes;
-window.revealVotes = async function() {
-    // 1. Apply Vote Shuffle (mutates state.votes before scoring)
-    applyVoteShuffle();
-
-    // 2. Triple Threat: tag the voter's vote with weight=3
-    const myId = state.currentUser?.id;
-    const myActive = AP.activeThisRound[myId];
-    if (myActive?.abilityId === 'triple_threat' && state.votes[myId]) {
-        state.votes[myId] = { ...state.votes[myId], tripleWeight: true };
-    }
-
-    return _origRevealVotes.apply(this, arguments);
-};
-
 /* ══════════════════════════════════════
-   PATCH showResults — full ability resolution
+   PATCH showResults — ability AP grants + cosmetic effects
    Runs AFTER the base showResults renders.
-   We handle: AP grants, streak, anon, curse,
-   marked_target, reflect, second_chance, triple_threat display.
 ══════════════════════════════════════ */
 const _origShowResults = window.showResults;
 window.showResults = function() {
@@ -5872,7 +5984,7 @@ window.showResults = function() {
 
     const myId = state.currentUser?.id;
 
-    // ── Recalculate correct/incorrect for each voter on this client ──
+    // ── Recalculate correct/incorrect for THIS player only ──
     const voterEntries = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
     const instigatorTarget = state.instigatorVote;
     const anyMatched = voterEntries.some(([, v]) => v.target === instigatorTarget);
@@ -5887,87 +5999,55 @@ window.showResults = function() {
         });
     }
 
-    // ── Only grant AP / streak for THIS client's player ──
-    // (Prevents double-counting from other players' showResults calls)
+    // ── Grant AP + streak for THIS client's player only ──
     if (myId && myId !== state.currentReader) {
         const myVote = state.votes[myId];
         if (myVote) {
             const correct = anyMatched ? myVote.target === instigatorTarget : myVote.target === majorityTargetId;
             handleStreakRewards(myId, correct);
-        }
-    }
 
-    // ── Anonymous Strike: in results list, replace voter name with "???" ──
-    // Find any voter using anon_strike
-    const anonVoters = Object.entries(AP.activeThisRound)
-        .filter(([, a]) => a.abilityId === 'anon_strike')
-        .map(([id]) => id);
-
-    if (anonVoters.length > 0) {
-        setTimeout(() => {
-            document.querySelectorAll('#resultsList .result-item').forEach(row => {
-                const nameEl = row.querySelector('.voter-name');
-                if (!nameEl) return;
-                // Check if this row belongs to an anon voter
-                anonVoters.forEach(anonId => {
-                    const anonPlayer = state.players.find(p => p.id === anonId);
-                    if (!anonPlayer) return;
-                    // If the name matches and the player isn't the instigator
-                    if (nameEl.textContent.includes(anonPlayer.name) && anonId !== myId) {
-                        nameEl.innerHTML = nameEl.innerHTML.replace(
-                            anonPlayer.name,
-                            '<span style="color:#8a8a9a;font-style:italic;">🕶️ Anonymous</span>'
-                        );
-                    }
-                });
-            });
-        }, 100);
-    }
-
-    // ── Curse: show toast for cursed player ──
-    Object.entries(AP.activeThisRound).forEach(([voterId, active]) => {
-        if (active.abilityId !== 'curse') return;
-        const cursedId = active.params?.targetId;
-        if (!cursedId) return;
-        const cursedPlayer = state.players.find(p => p.id === cursedId);
-        const wasVoted = voterEntries.some(([, v]) => v.target === cursedId);
-        if (wasVoted && cursedPlayer) {
-            setTimeout(() => showToast(`🔥 Curse hit ${cursedPlayer.name}! They lose 1 pt this round.`, 4000), 600);
-        }
-    });
-
-    // ── Marked Target: AP bonus for each other player who voted same target ──
-    if (myId && AP.activeThisRound[myId]?.abilityId === 'marked_target') {
-        const myVote = state.votes[myId];
-        if (myVote) {
-            const sameVoters = voterEntries.filter(([oid, ov]) => oid !== myId && ov.target === myVote.target).length;
-            if (sameVoters > 0) {
-                AP.addAP(myId, sameVoters * 15);
-                setTimeout(() => showToast(`🎯 Marked Target! +${sameVoters * 15} AP — ${sameVoters} player(s) agreed!`, 4000), 800);
-            }
-        }
-    }
-
-    // ── Reflect: show who got reflected ──
-    Object.entries(AP.activeThisRound).forEach(([reflectId, active]) => {
-        if (active.abilityId !== 'reflect') return;
-        const reflectedOn = voterEntries.filter(([, v]) => v.target === reflectId);
-        if (reflectedOn.length > 0) {
-            const names = reflectedOn.map(([id]) => state.players.find(p => p.id === id)?.name).filter(Boolean);
-            setTimeout(() => showToast(`🪞 Reflect! ${names.join(', ')} voted ${state.players.find(p => p.id === reflectId)?.name} — reflected back!`, 4000), 700);
-        }
-    });
-
-    // ── Second Chance: show toast if it saved points ──
-    if (myId && AP.activeThisRound[myId]?.abilityId === 'second_chance') {
-        const myVote = state.votes[myId];
-        if (myVote) {
-            const correct = anyMatched ? myVote.target === instigatorTarget : myVote.target === majorityTargetId;
-            const hadPenalty = myVote.doubleDown && !correct && state.doubleDownPenalty === 'minus_two';
-            if (hadPenalty || (!correct)) {
-                // Only relevant in harsh mode for the -2 cancel
-                if (state.doubleDownPenalty === 'minus_two' && hadPenalty) {
-                    setTimeout(() => showToast('❤️ Second Chance saved you from -2 pts!', 4000), 900);
+            // Show active ability feedback toasts
+            const myActive = AP.activeThisRound[myId];
+            if (myActive) {
+                const ab = ABILITIES[myActive.abilityId];
+                if (ab) {
+                    setTimeout(() => {
+                        if (myActive.abilityId === 'second_chance' && !correct) {
+                            showToast('❤️ Second Chance was active — your point loss was cancelled!', 4000);
+                        } else if (myActive.abilityId === 'triple_threat' && correct) {
+                            showToast('💥 Triple Threat: your vote counted as 3!', 4000);
+                        } else if (myActive.abilityId === 'dice_roll') {
+                            showToast('🎲 Dice Roll resolved!', 3000);
+                        } else if (myActive.abilityId === 'anon_strike') {
+                            showToast('🕶️ Anonymous Strike: your name was hidden!', 3000);
+                        } else if (myActive.abilityId === 'immunity') {
+                            showToast('🛡️ Immunity: you were removed from vote targets!', 3000);
+                        } else if (myActive.abilityId === 'kingmaker') {
+                            const target = state.players.find(p => p.id === myActive.params?.targetId);
+                            showToast(`👑 Kingmaker gave the round to ${target?.name || '?'}!`, 4000);
+                        } else if (myActive.abilityId === 'marked_target' && correct) {
+                            const sameVoters = voterEntries.filter(([oid, ov]) => oid !== myId && ov.target === (myVote.target)).length;
+                            if (sameVoters > 0) {
+                                AP.addAP(myId, sameVoters * 15);
+                                showToast(`🎯 Marked Target! +${sameVoters * 15} AP bonus!`, 4000);
+                            }
+                        } else if (myActive.abilityId === 'curse') {
+                            const cursedId = myActive.params?.targetId;
+                            const cursedPlayer = state.players.find(p => p.id === cursedId);
+                            const wasVoted = voterEntries.some(([, v]) => v.target === cursedId);
+                            if (wasVoted && cursedPlayer) {
+                                showToast(`🔥 Curse hit ${cursedPlayer.name}! They lost 1 pt.`, 4000);
+                            }
+                        } else if (myActive.abilityId === 'reflect') {
+                            const reflectedOn = voterEntries.filter(([, v]) => v.target === myId);
+                            if (reflectedOn.length > 0) {
+                                const names = reflectedOn.map(([id]) => state.players.find(p => p.id === id)?.name).filter(Boolean);
+                                showToast(`🪞 Reflect blocked ${names.join(', ')}!`, 4000);
+                            }
+                        } else if (myActive.abilityId === 'vote_shuffle') {
+                            showToast('🔀 Vote Shuffle scrambled all votes!', 3500);
+                        }
+                    }, 800);
                 }
             }
         }
@@ -5977,11 +6057,10 @@ window.showResults = function() {
     setTimeout(checkUnderdogReward, 600);
     setTimeout(checkLootBoxDrop, 1200);
 
-    // ── Re-render AP bar after short delay ──
+    // ── Re-render AP bar ──
     setTimeout(() => {
         AP.renderBar();
-        const lbl = document.getElementById('myApLabel');
-        if (lbl) lbl.textContent = `${AP.myAP} AP`;
+        AP.renderTray();
     }, 300);
 };
 
@@ -6000,6 +6079,7 @@ window.nextRound = async function() {
 ══════════════════════════════════════ */
 const _origInitGameView4 = window.initGameView;
 window.initGameView = function() {
+    AP.load(); // restore AP from localStorage on refresh
     _origInitGameView4.apply(this, arguments);
     setTimeout(() => {
         injectAbilityTray();
