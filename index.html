@@ -2533,6 +2533,9 @@ button:not(#muteBtn):active:not(:disabled) {
                 if (room.double_down_penalty) state.doubleDownPenalty = room.double_down_penalty;
                 if (room.points_to_win) { state.pointsToWin = room.points_to_win; CONFIG.POINTS_TO_WIN = room.points_to_win; }
                 if (room.scores) state.scores = room.scores;
+                if (room.ability_actions) state.abilityActions = room.ability_actions;
+                // Restore AP from localStorage on session resume
+                try { if (typeof AP !== 'undefined') AP.load(); } catch(e) {}
                 showScreen('gameScreen');
                 await loadPlayers(room.id);
                 await loadVotes(room.id);
@@ -2967,6 +2970,15 @@ button:not(#muteBtn):active:not(:disabled) {
         } else {
             // Already on game screen
             if (state.gameState === 'results') {
+                // Check for winner BEFORE showing results — only when a results event arrives
+                if (state.scores && Object.entries(state.scores).length > 0) {
+                    const winner = Object.entries(state.scores).find(([id, score]) => score >= CONFIG.POINTS_TO_WIN);
+                    if (winner) {
+                        state.gameState = 'winner';
+                        showWinner(winner[0]);
+                        return;
+                    }
+                }
                 showResults();
             } else if (isNewRound || wasResults) {
                 // NEW ROUND: Clear stale votes immediately before reinitializing
@@ -2980,11 +2992,12 @@ button:not(#muteBtn):active:not(:disabled) {
         }
     }
     
-    // Check for winner — only trigger once, and mark game as over
-    if (state.scores && Object.entries(state.scores).length > 0) {
+    // Winner check for clients joining from lobby (they land on game screen via the block above)
+    // For already-on-game-screen clients the check is handled inside the results block above.
+    // This handles only the lobby→game transition case.
+    if (state.gameState === 'results' && state.scores && Object.entries(state.scores).length > 0) {
         const winner = Object.entries(state.scores).find(([id, score]) => score >= CONFIG.POINTS_TO_WIN);
         if (winner && !document.getElementById('winnerScreen').classList.contains('active')) {
-            // Mark game over in local state so future room events are ignored
             state.gameState = 'winner';
             showWinner(winner[0]);
         }
@@ -3944,7 +3957,8 @@ button:not(#muteBtn):active:not(:disabled) {
                     scores: newScores,
                     last_majority: majorityTargetId,
                     majority_fallback: usedMajorityFallback,
-                    ability_actions: {} // clear after use
+                    // Keep ability_actions intact so all clients can read them in showResults.
+                    // They are cleared in nextRound() instead.
                 })
                 .eq('id', roomId);
             
@@ -4218,7 +4232,8 @@ button:not(#muteBtn):active:not(:disabled) {
                     current_round: state.round + 1,
                     last_majority: null,
                     majority_fallback: false,
-                    instigator_vote: null
+                    instigator_vote: null,
+                    ability_actions: {}
                 })
                 .eq('id', roomId);
             
@@ -5669,19 +5684,27 @@ const AP = {
         AP._syncActiveToRoom(me, abilityId, params);
     },
 
-    /* Sync active ability into the room's ability_actions column (JSON) */
+    /* Sync active ability into the room's ability_actions column (JSON).
+       Uses a read-modify-write with retry to avoid concurrent overwrites. */
     async _syncActiveToRoom(playerId, abilityId, params) {
         try {
             if (!state.currentUser?.room_id) return;
-            // Store in a separate table row or piggyback on votes table via a special field
-            // We'll use the votes table's double_down field isn't enough — 
-            // instead we append to a room metadata column
-            const { data: room } = await supabaseClient
-                .from('rooms').select('ability_actions').eq('id', state.currentUser.room_id).single();
-            const actions = room?.ability_actions || {};
-            actions[playerId] = { abilityId, params };
-            await supabaseClient.from('rooms').update({ ability_actions: actions })
-                .eq('id', state.currentUser.room_id);
+            // Retry up to 3 times to handle concurrent updates
+            for (let attempt = 0; attempt < 3; attempt++) {
+                const { data: room } = await supabaseClient
+                    .from('rooms').select('ability_actions').eq('id', state.currentUser.room_id).single();
+                const actions = room?.ability_actions || {};
+                actions[playerId] = { abilityId, params };
+                const { error } = await supabaseClient
+                    .from('rooms').update({ ability_actions: actions })
+                    .eq('id', state.currentUser.room_id);
+                if (!error) break;
+                // Small jitter before retry
+                await new Promise(r => setTimeout(r, 50 + Math.random() * 100));
+            }
+            // Also update local state so the tray reflects activation immediately
+            state.abilityActions = state.abilityActions || {};
+            state.abilityActions[playerId] = { abilityId, params };
         } catch(e) { console.warn('AP sync error:', e); }
     },
 
