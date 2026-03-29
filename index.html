@@ -1847,7 +1847,7 @@ button:not(#muteBtn):active:not(:disabled) {
         <div id="joinScreen" class="screen">
             <h1>👑 Who's The Worst?</h1>
             <p class="subtitle">The party game of savage voting 
-                <span class="rule-icon" onclick="showRules()">ℹ️</span>
+                <span class="rule-icon" onclick="playSound('click'); showRules()">ℹ️</span>
             </p>
             
             <div class="card">
@@ -1888,10 +1888,10 @@ button:not(#muteBtn):active:not(:disabled) {
             
             <div class="card">
                 <input type="password" id="adminPassword" placeholder="Admin password">
-                <button class="btn-admin" onclick="adminLogin()" id="adminLoginBtn">
+                <button class="btn-admin" onclick="playSound('click'); adminLogin()" id="adminLoginBtn">
                     Login
                 </button>
-                <button class="btn-secondary" onclick="showScreen('joinScreen')">
+                <button class="btn-secondary" onclick="playSound('click'); showScreen('joinScreen')">
                     Back to Game
                 </button>
                 <div id="adminLoginError" class="error"></div>
@@ -1904,8 +1904,8 @@ button:not(#muteBtn):active:not(:disabled) {
             <p class="subtitle">Manage game questions</p>
             
             <div class="tabs">
-                <button class="tab active" onclick="switchTab('add')">Add Question</button>
-                <button class="tab" onclick="switchTab('view')">View All</button>
+                <button class="tab active" onclick="playSound('click'); switchTab('add')">Add Question</button>
+                <button class="tab" onclick="playSound('click'); switchTab('view')">View All</button>
             </div>
 
             <div id="addTab" class="tab-content active">
@@ -1946,7 +1946,7 @@ button:not(#muteBtn):active:not(:disabled) {
                         <option value="FINAL DANGER ROUND">FINAL DANGER ROUND</option>
                         <option value="Custom">Custom</option>
                     </select>
-                    <button class="btn-primary" onclick="addNewQuestion()">Add Question</button>
+                    <button class="btn-primary" onclick="playSound('click'); addNewQuestion()">Add Question</button>
                     <div id="adminError" class="error"></div>
                 </div>
             </div>
@@ -1969,7 +1969,7 @@ button:not(#muteBtn):active:not(:disabled) {
             
             <div class="game-code-display">
                 <div style="font-size: 0.9rem; color: #a0a0a0; margin-bottom: 5px;">ROOM CODE</div>
-                <div class="game-code" id="displayRoomCode" onclick="copyRoomCode()">---</div>
+                <div class="game-code" id="displayRoomCode" onclick="playSound('click'); copyRoomCode()">---</div>
                 <div style="font-size: 0.8rem; color: #a0a0a0; margin-top: 5px;">Tap to copy</div>
             </div>
 
@@ -2029,7 +2029,7 @@ button:not(#muteBtn):active:not(:disabled) {
                             </div>
                         </div>
                     </div>
-                    <button class="btn-primary" onclick="startGame()" id="startBtn" disabled>
+                    <button class="btn-primary" onclick="playSound('click'); startGame()" id="startBtn" disabled>
                         Start Game
                     </button>
                 </div>
@@ -2068,8 +2068,8 @@ button:not(#muteBtn):active:not(:disabled) {
 
                 <div class="action-buttons">
                     <button class="btn-primary" onclick="playSound('click'); drawCard()" id="drawCardBtn">🃏 Draw Cards</button>
-                    <button class="btn-success hidden" onclick="revealVotes()" id="revealBtn">🎉 Reveal Votes</button>
-                    <button class="btn-primary hidden" onclick="nextRound()" id="nextRoundBtn">Next Round</button>
+                    <button class="btn-success hidden" onclick="playSound('click'); revealVotes()" id="revealBtn">🎉 Reveal Votes</button>
+                    <button class="btn-primary hidden" onclick="playSound('click'); nextRound()" id="nextRoundBtn">Next Round</button>
                 </div>
 
                 <div class="card" style="margin-top: 20px;">
@@ -2176,13 +2176,13 @@ button:not(#muteBtn):active:not(:disabled) {
                 
                 <div class="final-standings" id="finalStandings"></div>
                 
-                <button class="btn-primary" onclick="playAgain()">Play Again</button>
+                <button class="btn-primary" onclick="playSound('click'); playAgain()">Play Again</button>
                 <button class="btn-secondary" onclick="playSound('click'); leaveRoom()">Leave Room</button>
             </div>
         </div>
     </div>
 
-    <div id="rulesModal" class="rules-modal" onclick="hideRules(event)">
+    <div id="rulesModal" class="rules-modal" onclick="playSound('click'); hideRules(event)">
         <div class="rules-content" onclick="event.stopPropagation()">
             <h3>📋 How to Play</h3>
             <ol>
@@ -2195,7 +2195,7 @@ button:not(#muteBtn):active:not(:disabled) {
                 <li><strong>Double Play:</strong> Use once per game (or every round if host allows). Correct = 2 points, Wrong = lose card (or -2 pts in harsh mode).</li>
                 <li>Next round: New Instigator goes round-robin.</li>
             </ol>
-            <button class="btn-secondary close-rules" onclick="hideRules()">Got it</button>
+            <button class="btn-secondary close-rules" onclick="playSound('click'); hideRules()">Got it</button>
         </div>
     </div>
 
@@ -5604,7 +5604,7 @@ console.log('✨ Enhancement pack: Alive Players + Spotlight + Juicy Cards loade
 <!-- LOOT BOX MODAL HTML -->
 <div id="lootBoxModal">
     <div class="lootbox-panel">
-        <div class="lootbox-box" id="lootBoxIcon" onclick="openLootBox()">📦</div>
+        <div class="lootbox-box" id="lootBoxIcon" onclick="playSound('openBox'); openLootBox()">📦</div>
         <div class="lootbox-title">Mystery Box!</div>
         <div class="lootbox-sub" id="lootBoxSub">Tap to open your reward</div>
         <div class="lootbox-reveal" id="lootBoxReveal">
@@ -5908,7 +5908,7 @@ function injectAbilityTray() {
     tray.id = 'abilityTray';
     tray.innerHTML = `
         <h4>⚡ Your Abilities <span id="myApLabel">0 AP</span>
-            <button id="shopOpenBtn" onclick="openShop()">🛒 Shop</button>
+            <button id="shopOpenBtn" onclick="playSound('openShop'); openShop()">🛒 Shop</button>
         </h4>
         <div class="ability-slots"></div>
     `;
@@ -6750,13 +6750,13 @@ document.getElementById('shopModal').addEventListener('click', function(e) {
 
 console.log('⚡ Ability System v3 loaded — all abilities fully corrected');
 </script>
-<div id="cardPeekOverlay" onclick="closeCardPeekSheet()"></div>
+<div id="cardPeekOverlay" onclick="playSound('click'); closeCardPeekSheet()"></div>
 <div id="cardPeekSheet">
     <div class="sheet-handle"></div>
     <div class="sheet-category" id="sheetCategory"></div>
     <div class="sheet-question" id="sheetQuestion"></div>
-    <button class="sheet-pick-btn" id="sheetPickBtn" onclick="pickSheetCard()">✓ Pick This Card</button>
-    <button class="sheet-close-btn" onclick="closeCardPeekSheet()">← Back to cards</button>
+    <button class="sheet-pick-btn" id="sheetPickBtn" onclick="playSound('click'); pickSheetCard()">✓ Pick This Card</button>
+    <button class="sheet-close-btn" onclick="playSound('click'); closeCardPeekSheet()">← Back to cards</button>
 </div>
 
 </body>
