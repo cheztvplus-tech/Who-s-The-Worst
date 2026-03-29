@@ -5897,64 +5897,32 @@ function showStreakBanner(text) {
     setTimeout(() => el.classList.remove('show'), 3000);
 }
 
-function handleStreakRewards(playerId, wasCorrect) {
-    if (!AP.streaks[playerId]) AP.streaks[playerId] = 0;
-    if (wasCorrect) {
-        AP.streaks[playerId]++;
-        const streak = AP.streaks[playerId];
-        const isMe = playerId === state.currentUser?.id;
-
-        // AP per correct guess
-        AP.addAP(playerId, 20);
-
-        if (isMe) {
-            if (streak === 3) {
-                showStreakBanner('🔥 3 correct in a row! Random ability!');
-                setTimeout(() => showLootBox(getLootBoxAbility()), 1200);
-            } else if (streak === 5) {
-                showStreakBanner('💥 5 STREAK! Rare ability incoming!');
-                const rarePool = Object.values(ABILITIES).filter(a => a.rarity === 'rare' || a.rarity === 'epic');
-                const ab = rarePool[Math.floor(Math.random() * rarePool.length)];
-                setTimeout(() => showLootBox(ab.id), 1200);
-            } else if (streak === 6) {
-                showStreakBanner('👑 6 STREAK! LEGENDARY ABILITY!');
-                const legendPool = Object.values(ABILITIES).filter(a => a.rarity === 'legendary');
-                const ab = legendPool[Math.floor(Math.random() * legendPool.length)];
-                setTimeout(() => showLootBox(ab.id), 1200);
-            } else if (streak >= 2) {
-                showStreakBanner(`🔥 ${streak}x Streak! +10 AP bonus`);
-            }
-        }
-    } else {
-        AP.streaks[playerId] = 0;
-    }
-}
-
 /* ══════════════════════════════════════
    UNDERDOG FREE SHIELD
 ══════════════════════════════════════ */
+let _underdogGivenForRound = -1;
 function checkUnderdogReward() {
     const myId = state.currentUser?.id;
     if (!myId || !state.scores) return;
+    const thisRound = state.round || 1;
+    if (_underdogGivenForRound === thisRound) return; // already gave it this round
+
     const scores = Object.entries(state.scores);
     if (scores.length < 2) return;
     const minScore = Math.min(...scores.map(([,s]) => s));
     const myScore = state.scores[myId] || 0;
-    const isUnderdog = myScore <= minScore;
-    const inv = AP.inventory[myId] || [];
-    if (!isUnderdog) return;
+    // Only underdog if strictly the lowest AND at least 2 points behind the leader
+    const maxScore = Math.max(...scores.map(([,s]) => s));
+    if (myScore > minScore || maxScore - myScore < 2) return;
 
-    // Only give Second Chance free in harsh (minus_two) mode — otherwise just give AP
-    if (state.doubleDownPenalty === 'minus_two') {
-        if (!inv.includes('second_chance')) {
-            AP.giveAbility(myId, 'second_chance');
-            showToast('🛡️ Underdog bonus: Free Second Chance ability!', 4000);
-        }
-    } else {
-        // In other modes: give 20 bonus AP as consolation
-        AP.addAP(myId, 20);
-        showToast('🛡️ Underdog bonus: +20 AP!', 3000);
+    _underdogGivenForRound = thisRound;
+    const inv = AP.inventory[myId] || [];
+
+    if (state.doubleDownPenalty === 'minus_two' && !inv.includes('second_chance')) {
+        AP.giveAbility(myId, 'second_chance');
+        showToast('🛡️ Underdog bonus: Free Second Chance!', 4000);
     }
+    // No free AP — AP comes from guessing right/wrong
 }
 
 /* ══════════════════════════════════════
@@ -5974,17 +5942,31 @@ function checkLootBoxDrop() {
 ══════════════════════════════════════ */
 
 /* ══════════════════════════════════════
-   PATCH showResults — ability AP grants + cosmetic effects
-   Runs AFTER the base showResults renders.
+   PATCH showResults — AP grants + cosmetic effects
+   Uses a round stamp to ensure AP is granted
+   exactly once per player per round.
 ══════════════════════════════════════ */
+
+// Track which round AP was last granted for this player
+let _apGrantedForRound = -1;
+
 const _origShowResults = window.showResults;
 window.showResults = function() {
-    // Run the original first (renders the results list)
     _origShowResults.apply(this, arguments);
 
     const myId = state.currentUser?.id;
+    if (!myId) return;
 
-    // ── Recalculate correct/incorrect for THIS player only ──
+    // ── Only grant AP once per round ──
+    const thisRound = state.round || 1;
+    if (_apGrantedForRound === thisRound) {
+        // Already granted this round — just re-render bar
+        AP.renderBar();
+        AP.renderTray();
+        return;
+    }
+    _apGrantedForRound = thisRound;
+
     const voterEntries = Object.entries(state.votes).filter(([vid]) => vid !== state.currentReader);
     const instigatorTarget = state.instigatorVote;
     const anyMatched = voterEntries.some(([, v]) => v.target === instigatorTarget);
@@ -5999,45 +5981,75 @@ window.showResults = function() {
         });
     }
 
-    // ── Grant AP + streak for THIS client's player only ──
-    if (myId && myId !== state.currentReader) {
+    // ── Grant AP for this player only ──
+    if (myId === state.currentReader) {
+        // Instigator always gets 20 AP for running the round
+        AP.addAP(myId, 20);
+        setTimeout(() => showToast('🎯 +20 AP for being the Instigator!', 2500), 400);
+    } else {
         const myVote = state.votes[myId];
         if (myVote) {
-            const correct = anyMatched ? myVote.target === instigatorTarget : myVote.target === majorityTargetId;
-            handleStreakRewards(myId, correct);
+            const correct = anyMatched
+                ? myVote.target === instigatorTarget
+                : myVote.target === majorityTargetId;
 
-            // Show active ability feedback toasts
+            if (correct) {
+                AP.addAP(myId, 20);
+                setTimeout(() => showToast('✅ +20 AP — correct guess!', 2500), 400);
+                // Streak tracking (only increments on correct)
+                if (!AP.streaks[myId]) AP.streaks[myId] = 0;
+                AP.streaks[myId]++;
+                const streak = AP.streaks[myId];
+                if (streak === 3) {
+                    showStreakBanner('🔥 3 correct in a row! Random ability!');
+                    setTimeout(() => showLootBox(getLootBoxAbility()), 1400);
+                } else if (streak === 5) {
+                    showStreakBanner('💥 5 STREAK! Rare ability incoming!');
+                    const rarePool = Object.values(ABILITIES).filter(a => a.rarity === 'rare' || a.rarity === 'epic');
+                    setTimeout(() => showLootBox(rarePool[Math.floor(Math.random() * rarePool.length)].id), 1400);
+                } else if (streak === 6) {
+                    showStreakBanner('👑 6 STREAK! LEGENDARY!');
+                    const legendPool = Object.values(ABILITIES).filter(a => a.rarity === 'legendary');
+                    setTimeout(() => showLootBox(legendPool[Math.floor(Math.random() * legendPool.length)].id), 1400);
+                } else if (streak >= 2) {
+                    showStreakBanner(`🔥 ${streak}x Streak!`);
+                }
+            } else {
+                AP.addAP(myId, 10);
+                setTimeout(() => showToast('❌ +10 AP — wrong guess', 2000), 400);
+                AP.streaks[myId] = 0;
+            }
+
+            // ── Ability feedback toasts ──
             const myActive = AP.activeThisRound[myId];
             if (myActive) {
                 const ab = ABILITIES[myActive.abilityId];
                 if (ab) {
                     setTimeout(() => {
                         if (myActive.abilityId === 'second_chance' && !correct) {
-                            showToast('❤️ Second Chance was active — your point loss was cancelled!', 4000);
+                            showToast('❤️ Second Chance cancelled your point loss!', 4000);
                         } else if (myActive.abilityId === 'triple_threat' && correct) {
-                            showToast('💥 Triple Threat: your vote counted as 3!', 4000);
+                            showToast('💥 Triple Threat: your vote counted ×3!', 4000);
                         } else if (myActive.abilityId === 'dice_roll') {
-                            showToast('🎲 Dice Roll resolved!', 3000);
+                            showToast('🎲 Dice Roll applied to your score!', 3000);
                         } else if (myActive.abilityId === 'anon_strike') {
-                            showToast('🕶️ Anonymous Strike: your name was hidden!', 3000);
+                            showToast('🕶️ Anonymous: your name was hidden in results!', 3000);
                         } else if (myActive.abilityId === 'immunity') {
                             showToast('🛡️ Immunity: you were removed from vote targets!', 3000);
                         } else if (myActive.abilityId === 'kingmaker') {
                             const target = state.players.find(p => p.id === myActive.params?.targetId);
                             showToast(`👑 Kingmaker gave the round to ${target?.name || '?'}!`, 4000);
                         } else if (myActive.abilityId === 'marked_target' && correct) {
-                            const sameVoters = voterEntries.filter(([oid, ov]) => oid !== myId && ov.target === (myVote.target)).length;
+                            const sameVoters = voterEntries.filter(([oid, ov]) => oid !== myId && ov.target === myVote.target).length;
                             if (sameVoters > 0) {
-                                AP.addAP(myId, sameVoters * 15);
-                                showToast(`🎯 Marked Target! +${sameVoters * 15} AP bonus!`, 4000);
+                                AP.addAP(myId, sameVoters * 10);
+                                showToast(`🎯 Marked Target! +${sameVoters * 10} AP bonus!`, 4000);
                             }
                         } else if (myActive.abilityId === 'curse') {
                             const cursedId = myActive.params?.targetId;
                             const cursedPlayer = state.players.find(p => p.id === cursedId);
                             const wasVoted = voterEntries.some(([, v]) => v.target === cursedId);
-                            if (wasVoted && cursedPlayer) {
-                                showToast(`🔥 Curse hit ${cursedPlayer.name}! They lost 1 pt.`, 4000);
-                            }
+                            if (wasVoted && cursedPlayer) showToast(`🔥 Curse hit ${cursedPlayer.name}!`, 4000);
                         } else if (myActive.abilityId === 'reflect') {
                             const reflectedOn = voterEntries.filter(([, v]) => v.target === myId);
                             if (reflectedOn.length > 0) {
@@ -6047,21 +6059,17 @@ window.showResults = function() {
                         } else if (myActive.abilityId === 'vote_shuffle') {
                             showToast('🔀 Vote Shuffle scrambled all votes!', 3500);
                         }
-                    }, 800);
+                    }, 900);
                 }
             }
         }
     }
 
-    // ── Underdog & Loot Box checks ──
-    setTimeout(checkUnderdogReward, 600);
-    setTimeout(checkLootBoxDrop, 1200);
+    // ── Loot box every 3 rounds (once only) ──
+    setTimeout(checkLootBoxDrop, 1500);
 
-    // ── Re-render AP bar ──
-    setTimeout(() => {
-        AP.renderBar();
-        AP.renderTray();
-    }, 300);
+    AP.renderBar();
+    AP.renderTray();
 };
 
 /* ══════════════════════════════════════
@@ -6071,6 +6079,8 @@ const _origNextRound = window.nextRound;
 window.nextRound = async function() {
     AP.resetRound();
     AP.diceBonus = null;
+    _apGrantedForRound = -1;
+    _underdogGivenForRound = -1;
     return _origNextRound.apply(this, arguments);
 };
 
