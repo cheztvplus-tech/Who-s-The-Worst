@@ -2975,7 +2975,15 @@ button:not(#muteBtn):active:not(:disabled) {
         
     if (room.scores) state.scores = room.scores;
     // Sync ability_actions so showResults can read them on all clients
-    if (room.ability_actions !== undefined) state.abilityActions = room.ability_actions || {};
+    if (room.ability_actions !== undefined) {
+        state.abilityActions = room.ability_actions || {};
+        // If the vote grid is currently visible, re-render it immediately
+        // so abilities like Immunity take effect the moment they're cast
+        const voteGrid = document.getElementById('voteOptions');
+        if (voteGrid && voteGrid.children.length > 0) {
+            updateVoteOptions();
+        }
+    }
     
     // If winner screen is showing, only allow the host's "waiting" reset to pull us away
     if (document.getElementById('winnerScreen').classList.contains('active') && room.game_state !== 'waiting') return;
@@ -6725,20 +6733,25 @@ window.updateVoteOptions = function() {
         .map(([id]) => id);
 
     if (immunePlayers.length > 0) {
-        const originalPlayers = state.players;
-        // Keep the instigator in state.players but hide immune non-instigators from the vote grid
-        // Immune players are hidden from EVERYONE's vote grid...
-        // ...EXCEPT the caster themselves can still vote for themselves
         const myId = state.currentUser?.id;
+        const iAmImmune = immunePlayers.includes(myId);
+        const originalPlayers = state.players;
+
+        // For each player in the grid:
+        //   - If they are NOT immune → always show them
+        //   - If they ARE immune:
+        //       • Hide them from everyone EXCEPT themselves
+        //         (the immune player can still vote for themselves)
         state.players = state.players.filter(p => {
-            if (!immunePlayers.includes(p.id)) return true;  // not immune, show normally
-            if (p.id === myId && immunePlayers.includes(myId)) return true; // I'm immune, I can vote for myself
-            return false; // immune player hidden from everyone else
+            if (!immunePlayers.includes(p.id)) return true; // not immune, always visible
+            return p.id === myId; // immune: only visible to themselves
         });
+
         _origUpdateVoteOptionsAP.apply(this, arguments);
         state.players = originalPlayers;
-        if (immunePlayers.includes(state.currentUser?.id)) {
-            setTimeout(() => showToast("🛡️ Immunity active — only you can vote for yourself!", 4000), 300);
+
+        if (iAmImmune) {
+            setTimeout(() => showToast('🛡️ Immunity active — you are hidden from everyone!', 4000), 300);
         }
     } else {
         _origUpdateVoteOptionsAP.apply(this, arguments);
