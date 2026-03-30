@@ -5807,6 +5807,11 @@ const AP = {
             }
             state.abilityActions = state.abilityActions || {};
             state.abilityActions[playerId] = { abilityId, params };
+            // ── Immunity: re-render vote grid immediately on caster's client ──
+            // Other clients get the update via realtime → handleRoomChange → updateGameView
+            if (abilityId === 'immunity' && document.getElementById('voteOptions')) {
+                updateVoteOptions();
+            }
         } catch(e) { console.warn('AP sync error:', e); }
     },
 
@@ -6697,6 +6702,9 @@ window.nextRound = async function() {
 const _origInitGameViewAP = window.initGameView;
 window.initGameView = function() {
     AP.load();
+    // ── Reset ability pills for ALL clients at the start of every round ──
+    // (host resets via nextRound patch; non-host clients come through here)
+    AP.resetRound();
     _origInitGameViewAP.apply(this, arguments);
     setTimeout(() => {
         injectAbilityTray();
@@ -6719,11 +6727,18 @@ window.updateVoteOptions = function() {
     if (immunePlayers.length > 0) {
         const originalPlayers = state.players;
         // Keep the instigator in state.players but hide immune non-instigators from the vote grid
-        state.players = state.players.filter(p => !immunePlayers.includes(p.id) || p.id === state.currentReader);
+        // Immune players are hidden from EVERYONE's vote grid...
+        // ...EXCEPT the caster themselves can still vote for themselves
+        const myId = state.currentUser?.id;
+        state.players = state.players.filter(p => {
+            if (!immunePlayers.includes(p.id)) return true;  // not immune, show normally
+            if (p.id === myId && immunePlayers.includes(myId)) return true; // I'm immune, I can vote for myself
+            return false; // immune player hidden from everyone else
+        });
         _origUpdateVoteOptionsAP.apply(this, arguments);
         state.players = originalPlayers;
         if (immunePlayers.includes(state.currentUser?.id)) {
-            setTimeout(() => showToast("🛡️ Immunity active — you've been removed from the vote board!", 4000), 300);
+            setTimeout(() => showToast("🛡️ Immunity active — only you can vote for yourself!", 4000), 300);
         }
     } else {
         _origUpdateVoteOptionsAP.apply(this, arguments);
