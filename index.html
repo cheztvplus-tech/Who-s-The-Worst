@@ -2977,8 +2977,7 @@ button:not(#muteBtn):active:not(:disabled) {
     // Sync ability_actions so showResults can read them on all clients
     if (room.ability_actions !== undefined) {
         state.abilityActions = room.ability_actions || {};
-        // If the vote grid is currently visible, re-render it immediately
-        // so abilities like Immunity take effect the moment they're cast
+        // If the vote grid is visible, re-render it so immunity takes effect immediately
         const voteGrid = document.getElementById('voteOptions');
         if (voteGrid && voteGrid.children.length > 0) {
             updateVoteOptions();
@@ -3879,12 +3878,10 @@ button:not(#muteBtn):active:not(:disabled) {
                 showToast(`🔀 ${shufflerName} used Vote Shuffle — all votes scrambled!`, 4000);
             }
 
-            // ── IMMUNITY: remove immune players as valid targets ──
-            const immunePlayers = new Set(
-                Object.entries(abilityActions)
-                    .filter(([, a]) => a.abilityId === 'immunity')
-                    .map(([id]) => id)
-            );
+            // ── IMMUNITY: UI only — does not affect scoring ──
+            // Votes cast for an immune player (before or after immunity) score normally.
+            // Immunity only hides the player from the vote grid UI.
+            const immunePlayers = new Set(); // empty — not used in scoring
 
             // ── REFLECT: build reflect set ──
             const reflectors = new Set(
@@ -3906,7 +3903,8 @@ button:not(#muteBtn):active:not(:disabled) {
             const kingmakerTarget = kingmakerEntry?.[1]?.params?.targetId || null;
 
             // ── Determine who matched, respecting immunity ──
-            const effectiveTarget = immunePlayers.has(instigatorTarget) ? null : instigatorTarget;
+            // Immunity does not affect scoring — use raw instigatorTarget always
+            const effectiveTarget = instigatorTarget;
             const matchers = voterEntries.filter(([, vote]) => vote.target === effectiveTarget && effectiveTarget);
             const wrongVoters = voterEntries.filter(([, vote]) => vote.target !== effectiveTarget || !effectiveTarget);
             const wrongDoubleDowners = voterEntries.filter(([, vote]) => vote.doubleDown && (vote.target !== effectiveTarget || !effectiveTarget));
@@ -3968,9 +3966,8 @@ button:not(#muteBtn):active:not(:disabled) {
                 usedMajorityFallback = true;
                 const voteCounts = {};
                 voterEntries.forEach(([, vote]) => {
-                    if (!immunePlayers.has(vote.target)) {
-                        voteCounts[vote.target] = (voteCounts[vote.target] || 0) + 1;
-                    }
+                    // Immunity does not affect scoring — count all votes including immune players
+                    voteCounts[vote.target] = (voteCounts[vote.target] || 0) + 1;
                 });
                 let maxVotes = 0;
                 Object.entries(voteCounts).forEach(([target, count]) => {
@@ -4137,7 +4134,7 @@ button:not(#muteBtn):active:not(:disabled) {
             // Determine correctness
             let correct, points, penaltyText = '';
             const effectiveInstigatorTarget = Object.entries(abilityActions).some(([pid, a]) =>
-                a.abilityId === 'immunity' && pid === instigatorTarget) ? null : instigatorTarget;
+                a.abilityId === 'immunity' && pid === instigatorTarget) ? instigatorTarget : instigatorTarget; // immunity never nullifies target
 
             if (anyMatched) {
                 correct = vote.target === effectiveInstigatorTarget && effectiveInstigatorTarget;
@@ -6288,12 +6285,8 @@ window.revealVotes = async function() {
             voterEntries = voterEntries.map(([id, vote], i) => [id, { ...vote, target: shuffledTargets[i] }]);
         }
 
-        /* ── IMMUNITY: remove immune players as valid targets ── */
-        const immunePlayers = new Set(
-            Object.entries(abilityActions)
-                .filter(([, a]) => a.abilityId === 'immunity')
-                .map(([id]) => id)
-        );
+        // Immunity does not affect scoring — votes for immune players count normally
+        const immunePlayers = new Set(); // empty — immunity is UI only
 
         /* ── REFLECT set ── */
         const reflectors = new Set(
@@ -6314,8 +6307,8 @@ window.revealVotes = async function() {
         const kingmakerEntry  = Object.entries(abilityActions).find(([, a]) => a.abilityId === 'kingmaker');
         const kingmakerTarget = kingmakerEntry?.[1]?.params?.targetId || null;
 
-        /* ── Effective instigator target (immune players can't be hit) ── */
-        const effectiveTarget = immunePlayers.has(instigatorTarget) ? null : instigatorTarget;
+        /* ── Effective instigator target — immunity does not nullify it ── */
+        const effectiveTarget = instigatorTarget;
 
         const matchers      = voterEntries.filter(([, v]) => v.target === effectiveTarget && effectiveTarget);
         const anyMatched    = matchers.length > 0;
@@ -6487,9 +6480,9 @@ window.showResults = function() {
     const reflectors    = new Set(Object.entries(abilityActions).filter(([,a]) => a.abilityId === 'reflect').map(([id]) => id));
     const reflectNames  = [...reflectors].map(id => state.players.find(p => p.id === id)?.name).filter(Boolean);
 
-    /* ── IMMUNITY set ── */
-    const immunePlayers = new Set(Object.entries(abilityActions).filter(([,a]) => a.abilityId === 'immunity').map(([id]) => id));
-    const effectiveTarget = immunePlayers.has(instigatorTarget) ? null : instigatorTarget;
+    // Immunity does not affect scoring — votes for immune players count normally
+    const immunePlayers = new Set(); // empty — immunity is UI only
+    const effectiveTarget = instigatorTarget; // always the real target
 
     const anyMatched = voterEntries.some(([, v]) => v.target === effectiveTarget && effectiveTarget);
     let majorityTargetId = null;
@@ -6497,7 +6490,7 @@ window.showResults = function() {
     if (!anyMatched) {
         const voteCounts = {};
         voterEntries.forEach(([, v]) => {
-            if (!immunePlayers.has(v.target)) voteCounts[v.target] = (voteCounts[v.target] || 0) + 1;
+            voteCounts[v.target] = (voteCounts[v.target] || 0) + 1; // immunity does not affect scoring
         });
         let maxVotes = 0;
         Object.entries(voteCounts).forEach(([target, count]) => {
@@ -6737,21 +6730,18 @@ window.updateVoteOptions = function() {
         const iAmImmune = immunePlayers.includes(myId);
         const originalPlayers = state.players;
 
-        // For each player in the grid:
-        //   - If they are NOT immune → always show them
-        //   - If they ARE immune:
-        //       • Hide them from everyone EXCEPT themselves
-        //         (the immune player can still vote for themselves)
+        // Immune players are hidden from everyone's grid EXCEPT their own view
+        // (they can still vote for themselves)
         state.players = state.players.filter(p => {
-            if (!immunePlayers.includes(p.id)) return true; // not immune, always visible
-            return p.id === myId; // immune: only visible to themselves
+            if (!immunePlayers.includes(p.id)) return true; // not immune — always visible
+            return p.id === myId; // immune — only visible to themselves
         });
 
         _origUpdateVoteOptionsAP.apply(this, arguments);
         state.players = originalPlayers;
 
         if (iAmImmune) {
-            setTimeout(() => showToast('🛡️ Immunity active — you are hidden from everyone!', 4000), 300);
+            setTimeout(() => showToast('🛡️ Immunity active — you are hidden from everyone else!', 4000), 300);
         }
     } else {
         _origUpdateVoteOptionsAP.apply(this, arguments);
