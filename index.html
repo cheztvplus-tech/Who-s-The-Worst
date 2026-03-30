@@ -2027,6 +2027,11 @@ button:not(#muteBtn):active:not(:disabled) {
                                 <div style="font-size:0.75rem; font-weight:bold; margin-top:4px;">Reusable</div>
                                 <div style="font-size:0.65rem; color:#a0a0a0;">Lost if wrong</div>
                             </div>
+                            <div onclick="setPenalty('reusable_minus_two')" id="penaltyReusableMinusTwo" class="penalty-option" style="flex:1; padding:10px 6px; border-radius:10px; border:2px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); cursor:pointer; text-align:center;">
+                                <div style="font-size:1.2rem;">🔁</div>
+                                <div style="font-size:0.75rem; font-weight:bold; margin-top:4px;">Stays & -2</div>
+                                <div style="font-size:0.65rem; color:#a0a0a0;">-2 pts, kept</div>
+                            </div>
                         </div>
                     </div>
                     <button class="btn-primary" onclick="playSound('click'); startGame()" id="startBtn" disabled>
@@ -2651,8 +2656,8 @@ button:not(#muteBtn):active:not(:disabled) {
 
     function setPenalty(type) {
         state.doubleDownPenalty = type;
-        const ids = ['penaltyLoseCard', 'penaltyMinusTwo', 'penaltyReusable'];
-        const vals = ['lose_card', 'minus_two', 'reusable'];
+        const ids = ['penaltyLoseCard', 'penaltyMinusTwo', 'penaltyReusable', 'penaltyReusableMinusTwo'];
+        const vals = ['lose_card', 'minus_two', 'reusable', 'reusable_minus_two'];
         ids.forEach((id, i) => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -3818,7 +3823,8 @@ button:not(#muteBtn):active:not(:disabled) {
             
             // For 'lose_card' and 'minus_two': mark as used permanently
             // For 'reusable': only mark used if they win (handled at reveal); here just flag it was used this round
-            if (doubleDown && state.doubleDownPenalty !== 'reusable') {
+            // For 'reusable_minus_two': card is NEVER lost — don't mark used here
+            if (doubleDown && state.doubleDownPenalty !== 'reusable' && state.doubleDownPenalty !== 'reusable_minus_two') {
                 await supabaseClient
                     .from('players')
                     .update({ double_down_used: true })
@@ -3960,6 +3966,10 @@ button:not(#muteBtn):active:not(:disabled) {
                     if (penalty === 'reusable') {
                         supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
                     }
+                    if (penalty === 'reusable_minus_two') {
+                        newScores[voterId] = (newScores[voterId] || 0) - 2;
+                        // Card is NOT lost — intentionally no double_down_used update
+                    }
                 });
             } else {
                 // Nobody matched — fall back to majority vote
@@ -3993,6 +4003,10 @@ button:not(#muteBtn):active:not(:disabled) {
                         }
                         if (penalty === 'reusable') {
                             supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
+                        }
+                        if (penalty === 'reusable_minus_two') {
+                            newScores[voterId] = (newScores[voterId] || 0) - 2;
+                            // Card is NOT lost — no double_down_used update
                         }
                     }
                 });
@@ -4153,7 +4167,7 @@ button:not(#muteBtn):active:not(:disabled) {
                     if (vote.doubleDown) {
                         if (penalty === 'minus_two') { penaltyText = '💀 -2 pts'; points = isTriple ? points - 2 : -2; }
                         else if (penalty === 'reusable') { penaltyText = '♻️ Card lost'; if (!isTriple) points = 0; if (voterId === state.currentUser?.id) state.currentUser.double_down_used = true; }
-                        else if (penalty === 'reusable_minus_two') { penaltyText = '🔁 -2 pts + card lost'; points = isTriple ? points - 2 : -2; if (voterId === state.currentUser?.id) state.currentUser.double_down_used = true; }
+                        else if (penalty === 'reusable_minus_two') { penaltyText = '🔁 -2 pts (card kept)'; points = isTriple ? points - 2 : -2; }
                         else { penaltyText = '🃏 Lost Double Play'; if (!isTriple) points = 0; }
                     }
                 }
@@ -4171,7 +4185,7 @@ button:not(#muteBtn):active:not(:disabled) {
                     if (vote.doubleDown) {
                         if (penalty === 'minus_two') { penaltyText = '💀 -2 pts'; points = isTriple ? points - 2 : -2; }
                         else if (penalty === 'reusable') { penaltyText = '♻️ Card lost'; if (!isTriple) points = 0; if (voterId === state.currentUser?.id) state.currentUser.double_down_used = true; }
-                        else if (penalty === 'reusable_minus_two') { penaltyText = '🔁 -2 pts + card lost'; points = isTriple ? points - 2 : -2; if (voterId === state.currentUser?.id) state.currentUser.double_down_used = true; }
+                        else if (penalty === 'reusable_minus_two') { penaltyText = '🔁 -2 pts (card kept)'; points = isTriple ? points - 2 : -2; }
                         else { penaltyText = '🃏 Lost Double Play'; if (!isTriple) points = 0; }
                     }
                 }
@@ -6357,6 +6371,10 @@ window.revealVotes = async function() {
                 if (ab?.abilityId === 'second_chance') return;
                 if (penalty === 'minus_two') newScores[voterId] = (newScores[voterId] || 0) - 2;
                 if (penalty === 'reusable')  supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
+                if (penalty === 'reusable_minus_two') {
+                    newScores[voterId] = (newScores[voterId] || 0) - 2;
+                    // Card is NOT lost — no double_down_used update
+                }
             });
 
             // TRIPLE THREAT wrong: −3
@@ -6403,6 +6421,10 @@ window.revealVotes = async function() {
                         if (ab?.abilityId === 'second_chance') return;
                         if (penalty === 'minus_two') newScores[voterId] = (newScores[voterId] || 0) - 2;
                         if (penalty === 'reusable')  supabaseClient.from('players').update({ double_down_used: true }).eq('id', voterId);
+                        if (penalty === 'reusable_minus_two') {
+                            newScores[voterId] = (newScores[voterId] || 0) - 2;
+                            // Card is NOT lost — no double_down_used update
+                        }
                     }
                     if (ab?.abilityId === 'triple_threat') {
                         if (ab?.abilityId === 'second_chance') return;
@@ -6586,6 +6608,7 @@ window.showResults = function() {
             if (vote.doubleDown && ab?.abilityId !== 'second_chance') {
                 if (penalty === 'minus_two') { penaltyText = '💀 -2 pts'; pts = isTriple ? pts - 2 : -2; }
                 else if (penalty === 'reusable') { penaltyText = '♻️ Card lost'; if (!isTriple) pts = 0; }
+                else if (penalty === 'reusable_minus_two') { penaltyText = '🔁 -2 pts (card kept)'; pts = isTriple ? pts - 2 : -2; }
                 else { penaltyText = '🃏 Lost Double Play'; if (!isTriple) pts = 0; }
             } else if (vote.doubleDown && ab?.abilityId === 'second_chance') {
                 penaltyText = '❤️ Second Chance saved you!'; pts = 0;
@@ -6642,7 +6665,7 @@ window.showResults = function() {
         const myCorrect  = anyMatched ? myVote.target === instigatorTarget : myVote.target === majorityTargetId;
         const myPenalty  = !myCorrect && myVote.doubleDown;
         setTimeout(() => {
-            if      (myPenalty && penalty === 'minus_two')  playSound('penalty');
+            if      (myPenalty && (penalty === 'minus_two' || penalty === 'reusable_minus_two'))  playSound('penalty');
             else if (myPenalty)                              playSound('lost');
             else if (myCorrect)                              playSound('correct');
             else                                             playSound('wrong');
