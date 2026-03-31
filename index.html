@@ -2483,6 +2483,15 @@ button:not(#muteBtn):active:not(:disabled) {
     // ==========================================
     // INITIALIZATION
     // ==========================================
+    // ── Question encoding helpers ──
+    // Category is packed into current_question as "CATEGORY§§TEXT"
+    function decodeQuestion(raw) {
+        if (!raw) return { text: null, category: null };
+        const sep = raw.indexOf('§§');
+        if (sep === -1) return { text: raw, category: null };
+        return { text: raw.slice(sep + 2), category: raw.slice(0, sep) };
+    }
+
     window.onload = function() {
         console.log('Window loaded, initializing...');
         initSupabase();
@@ -2546,8 +2555,9 @@ button:not(#muteBtn):active:not(:disabled) {
 
             if (room.game_state === 'playing' || room.game_state === 'results') {
                 state.gameState = room.game_state;
-                state.currentQuestion = room.current_question;
-                state.currentCategory = room.current_category || null;
+                const _dq2 = decodeQuestion(room.current_question);
+                state.currentQuestion = _dq2.text;
+                state.currentCategory = _dq2.category;
                 state.currentReader = room.current_reader;
                 state.round = room.current_round || 1;
                 state.instigatorVote = room.instigator_vote;
@@ -2982,8 +2992,9 @@ button:not(#muteBtn):active:not(:disabled) {
     const wasResults = state.gameState === 'results';
     
     state.gameState = room.game_state;
-    state.currentQuestion = room.current_question;
-    state.currentCategory = room.current_category || null;
+    const _dq1 = decodeQuestion(room.current_question);
+    state.currentQuestion = _dq1.text;
+    state.currentCategory = _dq1.category;
     state.currentReader = room.current_reader;
     state.round = room.current_round;
     state.instigatorVote = room.instigator_vote;
@@ -3139,7 +3150,6 @@ button:not(#muteBtn):active:not(:disabled) {
                     started_at: new Date().toISOString(),
                     // ── Reset all stale state from previous game ──
                     current_question:  null,
-                    current_category:  null,
                     instigator_vote:   null,
                     current_round:     1,
                     last_majority:     null,
@@ -3826,13 +3836,15 @@ button:not(#muteBtn):active:not(:disabled) {
                 });
             }
             
-            // Update room with question (NOT instigator_vote yet)
+            // Update room with question — encode category into the field as "CATEGORY§§TEXT"
+            const encodedQuestion = category ? `${category}§§${questionText}` : questionText;
             await supabaseClient
                 .from('rooms')
-                .update({ current_question: questionText, current_category: category || null })
+                .update({ current_question: encodedQuestion })
                 .eq('id', roomId);
-            
+
             state.currentCategory = category || null;
+            state.currentQuestion = questionText;
             
             // Show player picker for Instigator
             showInstigatorVoteOptions();
@@ -4364,7 +4376,6 @@ button:not(#muteBtn):active:not(:disabled) {
                 .update({
                     game_state: 'playing',
                     current_question: null,
-                    current_category: null,
                     current_reader: nextReader,
                     current_round: state.round + 1,
                     last_majority: null,
@@ -4508,7 +4519,6 @@ button:not(#muteBtn):active:not(:disabled) {
                 await supabaseClient.from('rooms').update({
                     game_state:        'waiting',
                     current_question:  null,
-                    current_category:  null,
                     current_reader:    null,
                     instigator_vote:   null,
                     current_round:     1,
