@@ -2059,6 +2059,12 @@ button:not(#muteBtn):active:not(:disabled) {
                 <div class="round-progress-fill" id="roundProgress" style="width: 14%;"></div>
             </div>
         </div>
+        <!-- Game Settings Info Bar -->
+        <div id="gameSettingsBar" style="
+            display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+            margin-bottom: 14px;
+        "></div>
+
             <div class="scoreboard" id="scoreboard"></div>
 
             <!-- Reader View -->
@@ -2462,6 +2468,7 @@ button:not(#muteBtn):active:not(:disabled) {
         gameState: 'waiting',
         currentQuestion: null,
         currentReader: null,
+        currentCategory: null,
         votes: {},
         scores: {},
         doubleDownUsed: false,
@@ -2540,6 +2547,7 @@ button:not(#muteBtn):active:not(:disabled) {
             if (room.game_state === 'playing' || room.game_state === 'results') {
                 state.gameState = room.game_state;
                 state.currentQuestion = room.current_question;
+                state.currentCategory = room.current_category || null;
                 state.currentReader = room.current_reader;
                 state.round = room.current_round || 1;
                 state.instigatorVote = room.instigator_vote;
@@ -2953,6 +2961,7 @@ button:not(#muteBtn):active:not(:disabled) {
     if (room.game_state === 'waiting') {
         state.gameState               = 'waiting';
         state.currentQuestion         = null;
+        state.currentCategory         = null;
         state.currentReader           = null;
         state.instigatorVote          = null;
         state.instigatorVoteConfirmed = false;
@@ -2962,6 +2971,9 @@ button:not(#muteBtn):active:not(:disabled) {
         state.round                   = 1;
         state.abilityActions          = {};
         showScreen('lobbyScreen');
+        // Re-read host status from updated player record, then rebuild lobby UI
+        const roomId = room.id;
+        if (roomId) loadPlayers(roomId);
         return;
     }
 
@@ -2971,6 +2983,7 @@ button:not(#muteBtn):active:not(:disabled) {
     
     state.gameState = room.game_state;
     state.currentQuestion = room.current_question;
+    state.currentCategory = room.current_category || null;
     state.currentReader = room.current_reader;
     state.round = room.current_round;
     state.instigatorVote = room.instigator_vote;
@@ -3012,10 +3025,10 @@ button:not(#muteBtn):active:not(:disabled) {
             if (state.gameState === 'results') {
                 // Check for winner BEFORE showing results — only when a results event arrives
                 if (state.scores && Object.entries(state.scores).length > 0) {
-                    const winner = Object.entries(state.scores).find(([id, score]) => score >= CONFIG.POINTS_TO_WIN);
+                    const winner = checkForWinner(state.scores);
                     if (winner) {
                         state.gameState = 'winner';
-                        showWinner(winner[0]);
+                        showWinner(winner);
                         return;
                     }
                 }
@@ -3036,10 +3049,10 @@ button:not(#muteBtn):active:not(:disabled) {
     // For already-on-game-screen clients the check is handled inside the results block above.
     // This handles only the lobby→game transition case.
     if (state.gameState === 'results' && state.scores && Object.entries(state.scores).length > 0) {
-        const winner = Object.entries(state.scores).find(([id, score]) => score >= CONFIG.POINTS_TO_WIN);
+        const winner = checkForWinner(state.scores);
         if (winner && !document.getElementById('winnerScreen').classList.contains('active')) {
             state.gameState = 'winner';
-            showWinner(winner[0]);
+            showWinner(winner);
         }
     }
 }
@@ -3126,6 +3139,7 @@ button:not(#muteBtn):active:not(:disabled) {
                     started_at: new Date().toISOString(),
                     // ── Reset all stale state from previous game ──
                     current_question:  null,
+                    current_category:  null,
                     instigator_vote:   null,
                     current_round:     1,
                     last_majority:     null,
@@ -3152,6 +3166,7 @@ button:not(#muteBtn):active:not(:disabled) {
             CONFIG.POINTS_TO_WIN          = state.pointsToWin || 7;
             // ── Clear ALL stale state from previous game ──
             state.currentQuestion         = null;
+        state.currentCategory         = null;
             state.instigatorVote          = null;
             state.instigatorVoteConfirmed = false;
             state.hasVoted                = false;
@@ -3239,7 +3254,7 @@ button:not(#muteBtn):active:not(:disabled) {
                 // Step 2: Card picked, now choose a player
                 questionCard.style.display = 'flex';
                 questionCard.style.flexDirection = 'column';
-                questionCard.innerHTML = `<div style="color:#feca57;font-size:0.75rem;text-transform:uppercase;margin-bottom:10px;">📁 Question</div><div>${state.currentQuestion}</div>`;
+                questionCard.innerHTML = `<div style="color:#feca57;font-size:0.75rem;text-transform:uppercase;margin-bottom:10px;">📁 ${state.currentCategory || 'Question'}</div><div>${state.currentQuestion}</div>`;
                 showInstigatorVoteOptions();
                 if (drawBtn) {
                     drawBtn.textContent = 'Confirm Vote';
@@ -3251,7 +3266,7 @@ button:not(#muteBtn):active:not(:disabled) {
                 // Step 3: Vote confirmed, waiting for others
                 questionCard.style.display = 'flex';
                 questionCard.style.flexDirection = 'column';
-                questionCard.innerHTML = `<div style="color:#feca57;font-size:0.75rem;text-transform:uppercase;margin-bottom:10px;">📁 Question</div><div>${state.currentQuestion}</div>`;
+                questionCard.innerHTML = `<div style="color:#feca57;font-size:0.75rem;text-transform:uppercase;margin-bottom:10px;">📁 ${state.currentCategory || 'Question'}</div><div>${state.currentQuestion}</div>`;
                 document.getElementById('instigatorPicker')?.remove();
                 if (drawBtn) drawBtn.classList.add('hidden');
                 
@@ -3281,8 +3296,13 @@ button:not(#muteBtn):active:not(:disabled) {
             const voterStatus = document.getElementById('voterStatus');
 
             if (state.currentQuestion) {
-                voterQuestion.textContent = state.currentQuestion;
                 voterQuestion.classList.remove('waiting');
+                if (state.currentCategory) {
+                    voterQuestion.style.flexDirection = 'column';
+                    voterQuestion.innerHTML = `<div style="color:#feca57;font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;font-weight:800;margin-bottom:8px;">📁 ${state.currentCategory}</div><div>${state.currentQuestion}</div>`;
+                } else {
+                    voterQuestion.textContent = state.currentQuestion;
+                }
 
                 if (state.instigatorVoteConfirmed && !state.hasVoted) {
                     voterStatus.textContent = 'Guess who the Instigator picked!';
@@ -3412,7 +3432,36 @@ button:not(#muteBtn):active:not(:disabled) {
         updateVotingStatus();
     }
         
+    function renderGameSettingsBar() {
+        const bar = document.getElementById('gameSettingsBar');
+        if (!bar) return;
+        const ptw = CONFIG.POINTS_TO_WIN || state.pointsToWin || 7;
+        const penalty = state.doubleDownPenalty || 'lose_card';
+        const penaltyLabels = {
+            lose_card:          '🃏 Lose Card',
+            minus_two:          '💀 -2 pts',
+            reusable:           '♻️ Reusable',
+            reusable_minus_two: '🔁 Stays & -2'
+        };
+        const penaltyLabel = penaltyLabels[penalty] || penalty;
+        bar.innerHTML = `
+            <div style="
+                display:inline-flex;align-items:center;gap:5px;
+                background:rgba(254,202,87,0.1);border:1px solid rgba(254,202,87,0.3);
+                border-radius:20px;padding:5px 12px;
+                font-size:0.72rem;font-weight:700;color:#feca57;white-space:nowrap;
+            ">🏆 First to ${ptw} pts (by 1)</div>
+            <div style="
+                display:inline-flex;align-items:center;gap:5px;
+                background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.25);
+                border-radius:20px;padding:5px 12px;
+                font-size:0.72rem;font-weight:700;color:#ff8a8a;white-space:nowrap;
+            ">🚀 Wrong Double: ${penaltyLabel}</div>
+        `;
+    }
+
     function updateScoreboard() {
+        renderGameSettingsBar();
         const board = document.getElementById('scoreboard');
         const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
         const maxScore = sorted.length > 0 ? sorted[0][1] : 0;
@@ -3461,7 +3510,7 @@ button:not(#muteBtn):active:not(:disabled) {
                 const qCard = document.getElementById('readerQuestionCard');
                 qCard.style.display = 'flex';
                 qCard.style.flexDirection = 'column';
-                qCard.innerHTML = `<div style="color:#feca57;font-size:0.75rem;text-transform:uppercase;margin-bottom:10px;">📁 Question</div><div>${state.currentQuestion}</div>`;
+                qCard.innerHTML = `<div style="color:#feca57;font-size:0.75rem;text-transform:uppercase;margin-bottom:10px;">📁 ${state.currentCategory || 'Question'}</div><div>${state.currentQuestion}</div>`;
                 document.getElementById('drawCardBtn').classList.add('hidden');
                 document.getElementById('cardPicker')?.remove();
                 
@@ -3482,8 +3531,14 @@ button:not(#muteBtn):active:not(:disabled) {
             } else if (!state.hasVoted) {
                 updateInstigatorBanner();
                 if (state.instigatorVoteConfirmed) {
-                    document.getElementById('voterQuestionCard').textContent = state.currentQuestion;
-                    document.getElementById('voterQuestionCard').classList.remove('waiting');
+                    const voterQ = document.getElementById('voterQuestionCard');
+                    voterQ.classList.remove('waiting');
+                    if (state.currentCategory) {
+                        voterQ.style.flexDirection = 'column';
+                        voterQ.innerHTML = `<div style="color:#feca57;font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;font-weight:800;margin-bottom:8px;">📁 ${state.currentCategory}</div><div>${state.currentQuestion}</div>`;
+                    } else {
+                        voterQ.textContent = state.currentQuestion;
+                    }
                     document.getElementById('voterStatus').textContent = 'Guess who the Instigator picked!';
                     document.getElementById('voterStatus').classList.add('active');
                     document.getElementById('doubleDownSection').style.display = 'block';
@@ -3774,8 +3829,10 @@ button:not(#muteBtn):active:not(:disabled) {
             // Update room with question (NOT instigator_vote yet)
             await supabaseClient
                 .from('rooms')
-                .update({ current_question: questionText })
+                .update({ current_question: questionText, current_category: category || null })
                 .eq('id', roomId);
+            
+            state.currentCategory = category || null;
             
             // Show player picker for Instigator
             showInstigatorVoteOptions();
@@ -4047,8 +4104,15 @@ button:not(#muteBtn):active:not(:disabled) {
         document.getElementById('readerView').style.display = 'none';
         document.getElementById('voterView').style.display = 'none';
         document.getElementById('resultsView').style.display = 'block';
-        
-        document.getElementById('resultQuestion').textContent = state.currentQuestion || '';
+
+        const rqCard = document.getElementById('resultQuestion');
+        if (state.currentCategory) {
+            rqCard.style.flexDirection = 'column';
+            rqCard.innerHTML = `<div style="color:#feca57;font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;font-weight:800;margin-bottom:8px;">📁 ${state.currentCategory}</div><div>${state.currentQuestion || ''}</div>`;
+        } else {
+            rqCard.style.flexDirection = '';
+            rqCard.textContent = state.currentQuestion || '';
+        }
 
         // Show who instigator actually picked
         const instigatorPlayer = state.players.find(p => p.id === state.currentReader);
@@ -4300,6 +4364,7 @@ button:not(#muteBtn):active:not(:disabled) {
                 .update({
                     game_state: 'playing',
                     current_question: null,
+                    current_category: null,
                     current_reader: nextReader,
                     current_round: state.round + 1,
                     last_majority: null,
@@ -4323,6 +4388,18 @@ button:not(#muteBtn):active:not(:disabled) {
             console.error('Next round error:', error);
             showToast('Failed to advance: ' + error.message);
         }
+    }
+
+    function checkForWinner(scores) {
+        const POINTS_TO_WIN = CONFIG.POINTS_TO_WIN || state.pointsToWin || 7;
+        const entries = Object.entries(scores);
+        if (entries.length < 2) return null;
+        const sorted = entries.sort((a, b) => b[1] - a[1]);
+        const [topId, topScore] = sorted[0];
+        const [, secondScore]   = sorted[1];
+        // Must reach the threshold AND lead by at least 1
+        if (topScore >= POINTS_TO_WIN && topScore > secondScore) return topId;
+        return null;
     }
 
     function showWinner(winnerId) {
@@ -4431,6 +4508,7 @@ button:not(#muteBtn):active:not(:disabled) {
                 await supabaseClient.from('rooms').update({
                     game_state:        'waiting',
                     current_question:  null,
+                    current_category:  null,
                     current_reader:    null,
                     instigator_vote:   null,
                     current_round:     1,
@@ -4460,6 +4538,7 @@ button:not(#muteBtn):active:not(:disabled) {
         state.scores                  = {};
         state.round                   = 1;
         state.currentQuestion         = null;
+        state.currentCategory         = null;
         state.instigatorVote          = null;
         state.instigatorVoteConfirmed = false;
         state.hasVoted                = false;
@@ -4468,6 +4547,22 @@ button:not(#muteBtn):active:not(:disabled) {
         state.abilityActions          = {};
 
         showScreen('lobbyScreen');
+        document.getElementById('displayRoomCode').textContent = state.roomCode || '---';
+
+        // Show host controls or waiting message based on role
+        if (state.isHost) {
+            document.getElementById('hostControls').style.display = 'block';
+            document.getElementById('waitingMessage').style.display = 'none';
+            document.getElementById('playerRole').textContent = 'Host';
+            // Reset points/penalty selectors to current values
+            setPointsToWin(state.pointsToWin || 7);
+            setPenalty(state.doubleDownPenalty || 'lose_card');
+        } else {
+            document.getElementById('hostControls').style.display = 'none';
+            document.getElementById('waitingMessage').style.display = 'block';
+            document.getElementById('playerRole').textContent = 'Player';
+        }
+
         if (roomId) loadPlayers(roomId);
     }
 
@@ -6480,12 +6575,17 @@ window.revealVotes = async function() {
 let _apGrantedForRound = -1;
 
 window.showResults = function() {
-    // ── Run base UI setup (question card, instigator pick display, continue btn) ──
     document.getElementById('readerView').style.display  = 'none';
     document.getElementById('voterView').style.display   = 'none';
     document.getElementById('resultsView').style.display = 'block';
 
-    document.getElementById('resultQuestion').textContent = state.currentQuestion || '';
+    const resultQCard = document.getElementById('resultQuestion');
+    if (state.currentCategory) {
+        resultQCard.style.flexDirection = 'column';
+        resultQCard.innerHTML = `<div style="color:#feca57;font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;font-weight:800;margin-bottom:8px;">📁 ${state.currentCategory}</div><div>${state.currentQuestion || ''}</div>`;
+    } else {
+        resultQCard.textContent = state.currentQuestion || '';
+    }
     const pickedPlayer = state.players.find(p => p.id === state.instigatorVote);
     document.getElementById('instigatorPickDisplay').textContent = pickedPlayer ? pickedPlayer.name : '???';
 
